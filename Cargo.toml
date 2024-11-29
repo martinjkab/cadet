@@ -5,6 +5,8 @@ edition = "2021"
 
 [dependencies]
 easy-gltf = "1.1.2"
+prettytable = "0.10.0"
+rand = "0.8.5"
 
 [profile.dev]
 opt-level = 0
