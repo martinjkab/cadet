@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use glam::{DVec2, DVec4, Vec2, Vec4};
+use glam::{DVec2, DVec4};
 
 use rand::seq::IteratorRandom;
 
@@ -617,7 +617,7 @@ impl CDT {
     fn flip_edges(&mut self, p: Vertex, edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>) {
         while let Some(e) = edge_stack.pop_front() {
             let e_borrowed = e.borrow();
-            if e_borrowed.crep.len() > 0 {
+            if !e_borrowed.crep.is_empty() {
                 continue; // Skip constrained edges
             }
 
@@ -817,9 +817,7 @@ fn main() {
             constraints: 0,
         },
         cdt.edges
-            .iter()
-            .filter(|e| e.borrow().a.borrow().index == 3)
-            .next()
+            .iter().find(|e| e.borrow().a.borrow().index == 3)
             .unwrap()
             .clone(),
     );
