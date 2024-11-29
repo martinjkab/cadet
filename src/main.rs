@@ -77,7 +77,7 @@ impl CDT {
             .flat_map(|m| m.vertices().clone())
             .map(|v| (v.position.extend(1.), v.normal))
             .map(|v| {
-                let (p, n) = v.clone();
+                let (p, n) = v;
                 Vertex {
                     x: p.x as f64,
                     y: p.y as f64,
@@ -89,7 +89,7 @@ impl CDT {
         let indices = first_scene
             .models
             .iter()
-            .flat_map(|m| m.indices().clone())
+            .flat_map(|m| m.indices())
             .flatten()
             .collect::<Vec<_>>();
         println!("indices: {:?}", indices);
