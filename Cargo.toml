@@ -5,8 +5,12 @@ edition = "2021"
 
 [dependencies]
 easy-gltf = "1.1.2"
+glam = "0.29.2"
 prettytable = "0.10.0"
 rand = "0.8.5"
+
+[features]
+debug_refcell = []
 
 [profile.dev]
 opt-level = 0

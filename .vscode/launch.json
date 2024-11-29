@@ -9,7 +9,12 @@
       "request": "launch",
       "name": "Debug executable 'cdt'",
       "cargo": {
-        "args": ["build", "--bin=cdt", "--package=cdt"],
+        "args": [
+          "build",
+          "--bin=cdt",
+          "--package=cdt",
+          "--features=debug_refcell"
+        ],
         "filter": {
           "name": "cdt",
           "kind": "bin"
@@ -23,7 +28,13 @@
       "request": "launch",
       "name": "Debug unit tests in executable 'cdt'",
       "cargo": {
-        "args": ["test", "--no-run", "--bin=cdt", "--package=cdt"],
+        "args": [
+          "test",
+          "--no-run",
+          "--bin=cdt",
+          "--package=cdt",
+          "--features=debug_refcell"
+        ],
         "filter": {
           "name": "cdt",
           "kind": "bin"

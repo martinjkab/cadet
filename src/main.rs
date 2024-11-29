@@ -1,16 +1,17 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     rc::Rc,
 };
+
+use glam::{DVec2, DVec4, Vec2, Vec4};
 
 use rand::seq::IteratorRandom;
 
 #[derive(Clone, PartialEq, Debug)]
 struct Vertex {
-    index: usize, // Index of the vertex
-    x: f64,
-    y: f64,
+    index: usize,       // Index of the vertex
+    position: DVec2,    // Position of the vertex
     constraints: usize, // Number of constraints referencing this vertex
 }
 
@@ -19,7 +20,7 @@ impl std::fmt::Display for Vertex {
         write!(
             f,
             "Vertex {{ index: {}, x: {}, y: {}, constraints: {} }}",
-            self.index, self.x, self.y, self.constraints
+            self.index, self.position.x, self.position.y, self.constraints
         )
     }
 }
@@ -29,6 +30,12 @@ struct Edge {
     a: Rc<RefCell<Vertex>>,
     b: Rc<RefCell<Vertex>>,
     crep: HashSet<usize>, // Constraints represented by this edge
+}
+
+impl Edge {
+    pub fn edge_indices(&self) -> (usize, usize) {
+        (self.a.borrow().index, self.b.borrow().index)
+    }
 }
 
 impl std::fmt::Display for Edge {
@@ -50,6 +57,57 @@ struct Face {
     edges: [Rc<RefCell<Edge>>; 3],      // Indices of the edges
 }
 
+impl Face {
+    pub fn edge_indices(&self) -> [(usize, usize); 3] {
+        [
+            self.edges[0].borrow().edge_indices(),
+            self.edges[1].borrow().edge_indices(),
+            self.edges[2].borrow().edge_indices(),
+        ]
+    }
+
+    pub fn vertex_indices(&self) -> [usize; 3] {
+        [
+            self.vertices[0].borrow().index,
+            self.vertices[1].borrow().index,
+            self.vertices[2].borrow().index,
+        ]
+    }
+
+    pub fn opposite_vertex(&self, edge: &Edge) -> Rc<RefCell<Vertex>> {
+        let edge = edge.edge_indices();
+        self.vertices
+            .iter()
+            .find(|vertex| {
+                let index = vertex.borrow().index;
+                index != edge.0 && index != edge.1
+            })
+            .cloned()
+            .expect("Edge not found in face")
+    }
+
+    pub fn replace_edge(&mut self, old_edge: Rc<RefCell<Edge>>, new_edge: Rc<RefCell<Edge>>) {
+        for i in 0..3 {
+            if self.edges[i].borrow().edge_indices() == old_edge.borrow().edge_indices() {
+                self.edges[i] = new_edge.clone();
+                break;
+            }
+        }
+
+        // Update vertices
+        let old_edge = old_edge.borrow();
+        let new_edge = new_edge.borrow();
+
+        for i in 0..3 {
+            if self.vertices[i].borrow().index == old_edge.a.borrow().index {
+                self.vertices[i] = new_edge.a.clone();
+            } else if self.vertices[i].borrow().index == old_edge.b.borrow().index {
+                self.vertices[i] = new_edge.b.clone();
+            }
+        }
+    }
+}
+
 #[derive(Debug, Default)]
 struct CDT {
     vertices: Vec<Rc<RefCell<Vertex>>>,
@@ -64,7 +122,7 @@ struct CDT {
 struct SymEdge {
     vertex: Rc<RefCell<Vertex>>,
     edge: Rc<RefCell<Edge>>,
-    face: Option<Rc<RefCell<Face>>>,
+    face: Rc<RefCell<Face>>,
     nxt: Option<Rc<RefCell<SymEdge>>>,
     rot: Option<Rc<RefCell<SymEdge>>>,
 }
@@ -93,6 +151,14 @@ impl SymEdge {
         )
     }
 
+    pub fn neighbor(&self) -> Option<Rc<RefCell<SymEdge>>> {
+        self.nxt.clone()?.borrow().rot.clone()
+    }
+
+    pub fn neighbor_face(&self) -> Option<Rc<RefCell<Face>>> {
+        Some(self.neighbor()?.borrow().face.clone())
+    }
+
     fn pretty_print(&self) {
         // Create a table
         let mut table = prettytable::Table::new();
@@ -106,29 +172,23 @@ impl SymEdge {
         // Add each field in the struct as a table row
         table.add_row(prettytable::Row::new(vec![
             prettytable::Cell::new("vertex"),
-            prettytable::Cell::new(&self.vertex.borrow().to_string()),
+            prettytable::Cell::new(&format!("{:?}", &self.vertex.borrow().index)),
         ]));
 
         table.add_row(prettytable::Row::new(vec![
             prettytable::Cell::new("edge"),
-            prettytable::Cell::new(&self.edge.borrow().to_string()),
+            prettytable::Cell::new(&format!("{:?}", &self.edge.borrow().edge_indices())),
         ]));
 
-        match &self.face {
-            Some(face) => table.add_row(prettytable::Row::new(vec![
-                prettytable::Cell::new("face"),
-                prettytable::Cell::new(&face.borrow().id.to_string()),
-            ])),
-            None => table.add_row(prettytable::Row::new(vec![
-                prettytable::Cell::new("face"),
-                prettytable::Cell::new("None"),
-            ])),
-        };
+        table.add_row(prettytable::Row::new(vec![
+            prettytable::Cell::new("face"),
+            prettytable::Cell::new(&format!("{:?}", self.face.borrow().vertex_indices())),
+        ]));
 
         match &self.nxt {
             Some(nxt) => table.add_row(prettytable::Row::new(vec![
                 prettytable::Cell::new("nxt"),
-                prettytable::Cell::new(&nxt.borrow().bare_to_string()),
+                prettytable::Cell::new(&format!("{:?}", nxt.borrow().edge.borrow().edge_indices())),
             ])),
             None => table.add_row(prettytable::Row::new(vec![
                 prettytable::Cell::new("nxt"),
@@ -139,7 +199,7 @@ impl SymEdge {
         match &self.rot {
             Some(rot) => table.add_row(prettytable::Row::new(vec![
                 prettytable::Cell::new("rot"),
-                prettytable::Cell::new(&rot.borrow().bare_to_string()),
+                prettytable::Cell::new(&format!("{:?}", rot.borrow().edge.borrow().edge_indices())),
             ])),
             None => table.add_row(prettytable::Row::new(vec![
                 prettytable::Cell::new("rot"),
@@ -147,20 +207,15 @@ impl SymEdge {
             ])),
         };
 
-        match &self.nxt {
-            Some(nxt) => {
-                match &self.rot {
-                    Some(_) => {
-                        let neighbor = nxt.borrow().rot.clone().unwrap();
-                        table.add_row(prettytable::Row::new(vec![
-                            prettytable::Cell::new("neighbor"),
-                            prettytable::Cell::new(&neighbor.borrow().bare_to_string()),
-                        ]));
-                    }
-                    _ => (),
-                };
-            }
-            None => (),
+        let neighbor = self.neighbor();
+        if let Some(neighbor) = neighbor {
+            table.add_row(prettytable::Row::new(vec![
+                prettytable::Cell::new("neighbor"),
+                prettytable::Cell::new(&format!(
+                    "{:?}",
+                    neighbor.borrow().edge.borrow().edge_indices()
+                )),
+            ]));
         };
 
         // Print the table
@@ -180,16 +235,28 @@ impl CDT {
             .enumerate()
             .map(|(i, v)| {
                 let (p, _) = v;
+
                 Vertex {
-                    x: p.x as f64,
-                    y: p.y as f64,
+                    position: DVec2 {
+                        x: p.x as f64,
+                        y: p.z as f64,
+                    },
                     index: i,
                     constraints: 0,
                 }
             })
             .map(|v| Rc::new(RefCell::new(v)))
             .collect::<Vec<_>>();
-        println!("vertices: {:?}", vertices);
+        println!(
+            "vertices: {:?}",
+            vertices
+                .iter()
+                .map(|v| (
+                    v.borrow().index,
+                    (v.borrow().position.x, v.borrow().position.y)
+                ))
+                .collect::<Vec<_>>()
+        );
         let indices = first_scene
             .models
             .iter()
@@ -214,7 +281,7 @@ impl CDT {
                     let edge = Rc::new(RefCell::new(edge));
                     face_edges.push(edge);
                 }
-                edges.extend(face_edges.iter().map(|e| e.clone()));
+                edges.extend(face_edges.iter().cloned());
 
                 Face {
                     id: i,
@@ -261,14 +328,14 @@ impl CDT {
             let mut face_symedges = Vec::new();
             // let mut face_symedges_other = Vec::new();
 
-            for (i, &ref edge) in face.edges.iter().enumerate() {
+            for (i, edge) in face.edges.iter().enumerate() {
                 let vertex = face.vertices[i].clone();
 
                 // Create a new SymEdge
                 let sym = Rc::new(RefCell::new(SymEdge {
                     vertex: vertex.clone(),
                     edge: edge.clone(),
-                    face: Some(face_ref.clone()),
+                    face: face_ref.clone(),
                     nxt: None,
                     rot: None,
                 }));
@@ -277,7 +344,7 @@ impl CDT {
                 // Track SymEdges per vertex
                 self.sym_edges_by_vertices
                     .entry(vertex.borrow().index)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(sym.clone());
 
                 // Track SymEdges per edge
@@ -312,7 +379,7 @@ impl CDT {
                     edge.a.borrow()
                 };
 
-                let angle = (other_vertex.y - vertex.y).atan2(other_vertex.x - vertex.x);
+                let angle = (other_vertex.position - vertex.position).to_angle();
 
                 angle_to_sym_edges.push((angle, sym.clone()));
             }
@@ -320,12 +387,26 @@ impl CDT {
             //Sort by angle
             angle_to_sym_edges.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
 
+            println!(
+                "Angle to SymEdges ({:?}): {:?}",
+                vertex.index,
+                angle_to_sym_edges
+                    .iter()
+                    .map(|(a, b)| (a, b.borrow().edge.borrow().edge_indices()))
+                    .collect::<Vec<_>>()
+            );
+
+            if angle_to_sym_edges.len() < 2 {
+                continue;
+            }
+
             //Link the `rot` pointers to the first sym that is counter-clockwise
             for i in 0..angle_to_sym_edges.len() {
                 let current = angle_to_sym_edges[i].1.clone();
                 let next = angle_to_sym_edges[(i + 1) % angle_to_sym_edges.len()]
                     .1
                     .clone();
+
                 current.borrow_mut().rot = Some(next.clone());
             }
         }
@@ -352,7 +433,7 @@ impl CDT {
             // Step 2: Handle the locate result
             let vertex = match locate_result {
                 LocateResult::Vertex(v) => v,
-                LocateResult::Edge(edge) => Self::insert_point_on_edge(point.clone(), edge),
+                LocateResult::Edge(edge) => self.insert_point_on_edge(point.clone(), edge),
                 LocateResult::Face(face) => Self::insert_point_in_face(point.clone(), face),
                 LocateResult::None => {
                     continue;
@@ -372,21 +453,34 @@ impl CDT {
     }
 
     fn ccw(a: &Vertex, b: &Vertex, c: &Vertex) -> f64 {
-        (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)
+        let ab = a.position - b.position;
+        let ac = a.position - c.position;
+
+        ab.x * ac.y - ab.y * ac.x
     }
 
-    fn is_ccw(a: &Vertex, b: &Vertex, c: &Vertex) -> bool {
-        Self::ccw(a, b, c) > 0.0
+    fn is_ccw(a: &Vertex, b: &Vertex, c: &Vertex) -> Orientation {
+        println!("CCW: {:?}, {:?}, {:?}, {:?}", a, b, c, Self::ccw(a, b, c));
+        let ccw = Self::ccw(a, b, c);
+        let distance = ccw.abs()
+            / ((b.position.x - a.position.x).powi(2) + (b.position.y - a.position.y).powi(2))
+                .sqrt();
+        if distance < 1e-6 {
+            return Orientation::Collinear;
+        }
+        if ccw > 0.0 {
+            return Orientation::CounterClockwise;
+        }
+        Orientation::Clockwise
     }
 
-    fn is_point_on_edge(p: &Vertex, triangle: &Face, epsilon: f64) -> bool {
+    fn is_point_on_edge(p: &Vertex, triangle: &Face) -> bool {
         for i in 0..3 {
             let a = triangle.vertices[i].borrow();
             let b = triangle.vertices[(i + 1) % 3].borrow();
 
-            let distance =
-                Self::ccw(&a, &b, &p).abs() / ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
-            if distance < epsilon {
+            let is_ccw = Self::is_ccw(&a, &b, p);
+            if is_ccw == Orientation::Collinear {
                 return true;
             }
         }
@@ -402,34 +496,41 @@ impl CDT {
 
         let random_sample = self.faces.iter().choose_multiple(&mut rng, sample_size);
 
-        let mut closest_triangle = random_sample[0];
+        let mut closest_face = random_sample[0];
         let mut min_distance = f64::MAX;
 
         for triangle in random_sample {
             for vertex in &triangle.borrow().vertices {
                 let vertex = vertex.borrow();
-                let distance = (vertex.x - p.x).powi(2) + (vertex.y - p.y).powi(2);
+                let distance = (vertex.position.x - p.position.x).powi(2)
+                    + (vertex.position.y - p.position.y).powi(2);
                 if distance < min_distance {
                     min_distance = distance;
-                    closest_triangle = triangle;
+                    closest_face = triangle;
                 }
             }
         }
 
+        println!("Closest face: {:?}", closest_face.borrow().vertex_indices());
+
         // Step 2: Walk - Oriented walk to locate p
-        let mut current_face = closest_triangle;
         let mut visited = vec![false; self.faces.len()];
 
         loop {
-            let vertices = current_face.borrow().vertices.clone();
+            let vertices = closest_face.borrow().vertices.clone();
             let vertices = [
                 vertices[0].borrow(),
                 vertices[1].borrow(),
                 vertices[2].borrow(),
             ];
+
             let centroid = Vertex {
-                x: (vertices[0].x + vertices[1].x + vertices[2].x) / 3.0,
-                y: (vertices[0].y + vertices[1].y + vertices[2].y) / 3.0,
+                position: DVec2 {
+                    x: (vertices[0].position.x + vertices[1].position.x + vertices[2].position.x)
+                        / 3.0,
+                    y: (vertices[0].position.y + vertices[1].position.y + vertices[2].position.y)
+                        / 3.0,
+                },
                 index: 0,
                 constraints: 0,
             };
@@ -437,15 +538,28 @@ impl CDT {
             let mut selected_edge_index = None;
 
             // Find the edge that separates p and the centroid
-            for (i, edge) in current_face.borrow().edges.iter().enumerate() {
+            for (i, edge) in closest_face.borrow().edges.iter().enumerate() {
                 let edge_ref = edge.clone();
                 let edge_borrowed = edge_ref.borrow();
                 let vertex = edge_borrowed.a.borrow();
                 let next_vertex = edge_borrowed.b.borrow();
 
-                if Self::is_ccw(&vertex, &next_vertex, &p)
-                    != Self::is_ccw(&vertex, &next_vertex, &centroid)
-                {
+                let is_point_ccw = Self::is_ccw(&vertex, &next_vertex, p);
+                let is_centroid_ccw = Self::is_ccw(&vertex, &next_vertex, &centroid);
+                let is_separating_edge = is_point_ccw != is_centroid_ccw;
+
+                println!(
+                    "Edge: {:?}, is_point_ccw: {:?}, is_centroid_ccw: {:?}",
+                    edge_borrowed.edge_indices(),
+                    is_point_ccw,
+                    is_centroid_ccw,
+                );
+
+                if is_point_ccw == Orientation::Collinear {
+                    return LocateResult::Edge(edge.clone());
+                }
+
+                if is_separating_edge {
                     selected_edge_index = Some(i);
                     break;
                 }
@@ -454,26 +568,26 @@ impl CDT {
             if let Some(edge_index) = selected_edge_index {
                 // Move to the adjacent triangle across the selected edge
                 if let Some(neighbor) =
-                    self.find_neighboring_face(&current_face.borrow(), edge_index)
+                    self.find_neighboring_face(&closest_face.borrow(), edge_index)
                 {
                     if visited[neighbor.borrow().id] {
                         // A loop is detected; fallback to epsilon-based checks
-                        if Self::is_point_on_edge(p, &current_face.borrow(), epsilon) {
+                        if Self::is_point_on_edge(p, &closest_face.borrow()) {
                             return LocateResult::Edge(
-                                current_face.borrow().edges[edge_index].clone(),
+                                closest_face.borrow().edges[edge_index].clone(),
                             );
                         }
-                        return LocateResult::Face(current_face.clone());
+                        return LocateResult::Face(closest_face.clone());
                     }
 
-                    visited[current_face.borrow().id] = true;
-                    current_face = &self.faces[neighbor.borrow().id];
+                    visited[closest_face.borrow().id] = true;
+                    closest_face = &self.faces[neighbor.borrow().id];
                 } else {
-                    return LocateResult::Face(current_face.clone());
+                    return LocateResult::Face(closest_face.clone());
                 }
             } else {
                 // The point is inside the current triangle
-                return LocateResult::Face(current_face.clone());
+                return LocateResult::Face(closest_face.clone());
             }
         }
     }
@@ -485,30 +599,198 @@ impl CDT {
         let b_index = edge.b.borrow().index;
         let sym_edge = self.sym_edges_by_edges.get(&(a_index, b_index))?.borrow();
 
-        sym_edge
-            .nxt
-            .clone()?
-            .borrow()
-            .rot
-            .clone()?
-            .borrow()
-            .face
-            .clone()
+        sym_edge.neighbor_face()
     }
 
-    fn insert_point_on_edge(point: Vertex, edge: Rc<RefCell<Edge>>) -> Rc<RefCell<Vertex>> {
-        todo!()
+    // Check if an edge is Delaunay using the in-circle test
+    fn is_delaunay(p: DVec2, a: DVec2, b: DVec2, o: DVec2) -> bool {
+        let matrix = glam::DMat4::from_cols(
+            DVec4::new(p.x, p.y, p.length_squared(), 1.0),
+            DVec4::new(a.x, a.y, a.length_squared(), 1.0),
+            DVec4::new(b.x, b.y, b.length_squared(), 1.0),
+            DVec4::new(o.x, o.y, o.length_squared(), 1.0),
+        );
+        matrix.determinant() <= 0.0 // True if the point is not inside the circumcircle
+    }
+
+    // Edge-flipping routine
+    fn flip_edges(&mut self, p: Vertex, edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>) {
+        while let Some(e) = edge_stack.pop_front() {
+            let e_borrowed = e.borrow();
+            if e_borrowed.crep.len() > 0 {
+                continue; // Skip constrained edges
+            }
+
+            // Get edge endpoints
+            let a = e_borrowed.a.borrow();
+            let b = e_borrowed.b.borrow();
+
+            let sym_edge = self.sym_edges_by_edges.get(&(a.index, b.index)).unwrap();
+            let face = sym_edge.borrow().face.clone();
+
+            println!(
+                "Checking edge: {:?}, face vertices: {:?}",
+                e.borrow().edge_indices(),
+                face.borrow().vertex_indices()
+            );
+
+            let o = face.borrow().opposite_vertex(&e_borrowed);
+            let o = o.borrow();
+
+            if Self::is_delaunay(p.position, a.position, b.position, o.position) {
+                continue; // Skip if the edge is already Delaunay
+            }
+
+            {
+                let face_borrowed = face.borrow();
+                let different_edges = face_borrowed
+                    .edges
+                    .iter()
+                    .filter(|x| x.borrow().edge_indices() != (a.index, b.index))
+                    .collect::<Vec<_>>();
+
+                edge_stack.push_back(different_edges[0].clone());
+                edge_stack.push_back(different_edges[1].clone());
+
+                println!("Flipping edge: {:?}", e.borrow().edge_indices());
+            }
+
+            self.flip_edge(e.clone());
+        }
+    }
+
+    fn flip_edge(&mut self, edge: Rc<RefCell<Edge>>) {
+        let sym_edge = self
+            .sym_edges_by_edges
+            .get(&(edge.borrow().edge_indices()))
+            .unwrap();
+        let sym_edge_borrowed = sym_edge.borrow();
+
+        let f1 = sym_edge_borrowed.face.clone();
+        let f2 = match sym_edge_borrowed.neighbor_face() {
+            Some(face) => face,
+            None => return,
+        };
+
+        println!(
+            "f1 vertices: {:?}, f2 vertices: {:?}",
+            f1.borrow().vertex_indices(),
+            f2.borrow().vertex_indices()
+        );
+
+        // Az e élt nem tartalmazó csúcsok mindkét háromszögben
+        let v1 = f1.borrow().opposite_vertex(&edge.borrow());
+        let v2 = f2.borrow().opposite_vertex(&edge.borrow());
+
+        let a = edge.borrow().a.clone();
+        let b = edge.borrow().b.clone();
+
+        let new_edge = Edge {
+            a: v1.clone(),
+            b: v2.clone(),
+            crep: edge.borrow().crep.clone(),
+        };
+        let new_edge = Rc::new(RefCell::new(new_edge));
+
+        // Update the faces
+        f1.borrow_mut().replace_edge(edge.clone(), new_edge.clone());
+
+        f2.borrow_mut().replace_edge(edge.clone(), new_edge.clone());
+    }
+
+    fn insert_point_on_edge(
+        &mut self,
+        point: Vertex,
+        edge: Rc<RefCell<Edge>>,
+    ) -> Rc<RefCell<Vertex>> {
+        let edge = edge.borrow();
+        let a = edge.a.borrow();
+        let b = edge.b.borrow();
+
+        let ab = b.position - a.position;
+        let ap = point.position - a.position;
+
+        let t = ap.dot(ab) / ab.dot(ab);
+        let t = t.clamp(0.0, 1.0);
+
+        let v = Vertex {
+            position: a.position + ab * t,
+            index: 0,
+            constraints: 0,
+        };
+
+        let v = Rc::new(RefCell::new(v));
+
+        // Set the crep list of the two created sub edges of e to be orig
+        let orig = edge.crep.clone();
+        let edge1 = Edge {
+            a: edge.a.clone(),
+            b: v.clone(),
+            crep: orig.clone(),
+        };
+        let edge2 = Edge {
+            a: v.clone(),
+            b: edge.b.clone(),
+            crep: orig.clone(),
+        };
+
+        let edge1 = Rc::new(RefCell::new(edge1));
+        let edge2 = Rc::new(RefCell::new(edge2));
+
+        let sym_edge = self.sym_edges_by_edges.get(&(a.index, b.index)).unwrap();
+        let face_1 = sym_edge.borrow().face.clone();
+        let face_2 = sym_edge.borrow().neighbor_face().unwrap();
+
+        // These edges are the outlines of the face_1 and face_2 (does not include the shared edge)
+        let face_1_edges = face_1.borrow().edges.clone();
+        let face_2_edges = face_2.borrow().edges.clone();
+        let mut all_edges = vec![
+            face_1_edges[0].clone(),
+            face_1_edges[1].clone(),
+            face_1_edges[2].clone(),
+            face_2_edges[0].clone(),
+            face_2_edges[1].clone(),
+            face_2_edges[2].clone(),
+        ];
+
+        println!(
+            "All edges: {:?}",
+            all_edges
+                .iter()
+                .map(|x| x.borrow().edge_indices())
+                .collect::<Vec<_>>()
+        );
+
+        //Remove the shared edge
+        all_edges.retain(|x| {
+            x.borrow().edge_indices() != (a.index, b.index)
+                && x.borrow().edge_indices() != (b.index, a.index)
+        });
+
+        println!(
+            "All edges after removal: {:?}",
+            all_edges
+                .iter()
+                .map(|x| x.borrow().edge_indices())
+                .collect::<Vec<_>>()
+        );
+
+        let mut edge_stack = VecDeque::new();
+        edge_stack.extend(all_edges);
+
+        self.flip_edges(point, &mut edge_stack);
+
+        v
     }
 
     fn insert_point_in_face(point: Vertex, face: Rc<RefCell<Face>>) -> Rc<RefCell<Vertex>> {
         todo!()
     }
 
-    fn insert_segment(v: Rc<RefCell<Vertex>>, vs: Rc<RefCell<Vertex>>, constraint_id: usize) {
-        todo!()
-    }
+    fn insert_segment(v: Rc<RefCell<Vertex>>, vs: Rc<RefCell<Vertex>>, constraint_id: usize) {}
 }
 
+#[derive(Debug)]
 enum LocateResult {
     Vertex(Rc<RefCell<Vertex>>),
     Edge(Rc<RefCell<Edge>>),
@@ -516,9 +798,29 @@ enum LocateResult {
     None,
 }
 
+#[derive(Debug, PartialEq)]
+enum Orientation {
+    Clockwise,
+    CounterClockwise,
+    Collinear,
+}
+
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
     println!("{}", std::env::current_dir().unwrap().display());
     let mut cdt = CDT::from_gltf("C:/Projects/Study/cdt/models/model.glb");
     cdt.build_sym_edges().unwrap();
+    cdt.insert_point_on_edge(
+        Vertex {
+            position: DVec2 { x: 0.0, y: 0.0 },
+            index: 0,
+            constraints: 0,
+        },
+        cdt.edges
+            .iter()
+            .filter(|e| e.borrow().a.borrow().index == 3)
+            .next()
+            .unwrap()
+            .clone(),
+    );
 }
