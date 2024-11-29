@@ -1,0 +1,11 @@
+[package]
+name = "cdt"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+easy-gltf = "1.1.2"
+
+[profile.dev]
+opt-level = 0
+debug = true
