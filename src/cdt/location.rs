@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use glam::DVec2;
 use rand::seq::IteratorRandom;
@@ -8,8 +8,7 @@ use crate::{face::Face, locate_result::LocateResult, orientation::Orientation, v
 use super::cdt::CDT;
 
 impl CDT {
-    pub fn locate_point(&mut self, p: &Vertex) -> LocateResult {
-        let epsilon = 1e-6;
+    pub fn locate_point(&mut self, p: &DVec2) -> LocateResult {
         // Step 1: Jump - Select a random vertex sample and find the closest one
         let num_vertices = self.faces.len();
         let sample_size = (num_vertices as f64).powf(1.0 / 3.0).ceil() as usize;
@@ -17,23 +16,23 @@ impl CDT {
 
         let random_sample = self.faces.iter().choose_multiple(&mut rng, sample_size);
 
-        let mut closest_face = random_sample[0];
+        let mut closest_face = random_sample[0].clone();
         let mut min_distance = f64::MAX;
 
         for triangle in random_sample {
             for vertex in &triangle.borrow().vertices {
                 let vertex = vertex.borrow();
-                let distance = (vertex.position.x - p.position.x).powi(2)
-                    + (vertex.position.y - p.position.y).powi(2);
+                let distance =
+                    (vertex.position.x - p.x).powi(2) + (vertex.position.y - p.y).powi(2);
                 if distance < min_distance {
                     min_distance = distance;
-                    closest_face = triangle;
+                    closest_face = triangle.clone();
                 }
             }
         }
 
         // Step 2: Walk - Oriented walk to locate p
-        let mut visited = vec![false; self.faces.len()];
+        let mut visited = HashMap::<usize, bool>::new();
 
         loop {
             let vertices = closest_face.borrow().vertices.clone();
@@ -43,15 +42,9 @@ impl CDT {
                 vertices[2].borrow(),
             ];
 
-            let centroid = Vertex {
-                position: DVec2 {
-                    x: (vertices[0].position.x + vertices[1].position.x + vertices[2].position.x)
-                        / 3.0,
-                    y: (vertices[0].position.y + vertices[1].position.y + vertices[2].position.y)
-                        / 3.0,
-                },
-                index: 0,
-                constraints: 0,
+            let centroid = DVec2 {
+                x: (vertices[0].position.x + vertices[1].position.x + vertices[2].position.x) / 3.0,
+                y: (vertices[0].position.y + vertices[1].position.y + vertices[2].position.y) / 3.0,
             };
 
             let mut selected_edge_index = None;
@@ -63,8 +56,9 @@ impl CDT {
                 let vertex = edge_borrowed.a.borrow();
                 let next_vertex = edge_borrowed.b.borrow();
 
-                let is_point_ccw = Self::is_ccw(&vertex, &next_vertex, p);
-                let is_centroid_ccw = Self::is_ccw(&vertex, &next_vertex, &centroid);
+                let is_point_ccw = Self::is_ccw(&vertex.position, &next_vertex.position, p);
+                let is_centroid_ccw =
+                    Self::is_ccw(&vertex.position, &next_vertex.position, &centroid);
                 let is_separating_edge = is_point_ccw != is_centroid_ccw;
 
                 if is_point_ccw == Orientation::Collinear {
@@ -80,9 +74,9 @@ impl CDT {
             if let Some(edge_index) = selected_edge_index {
                 // Move to the adjacent triangle across the selected edge
                 if let Some(neighbor) =
-                    self.find_neighboring_face(&closest_face.borrow(), edge_index)
+                    self.find_neighboring_face(&closest_face.clone().borrow(), edge_index)
                 {
-                    if visited[neighbor.borrow().id] {
+                    if visited.get(&neighbor.borrow().id).copied().unwrap_or(false) {
                         // A loop is detected; fallback to epsilon-based checks
                         if Self::is_point_on_edge(p, &closest_face.borrow()) {
                             return LocateResult::Edge(
@@ -92,8 +86,8 @@ impl CDT {
                         return LocateResult::Face(closest_face.clone());
                     }
 
-                    visited[closest_face.borrow().id] = true;
-                    closest_face = &self.faces[neighbor.borrow().id];
+                    visited.insert(closest_face.borrow().id, true);
+                    closest_face = neighbor.clone();
                 } else {
                     return LocateResult::Face(closest_face.clone());
                 }
@@ -104,12 +98,12 @@ impl CDT {
         }
     }
 
-    pub fn is_point_on_edge(p: &Vertex, triangle: &Face) -> bool {
+    pub fn is_point_on_edge(p: &DVec2, triangle: &Face) -> bool {
         for i in 0..3 {
             let a = triangle.vertices[i].borrow();
             let b = triangle.vertices[(i + 1) % 3].borrow();
 
-            let is_ccw = Self::is_ccw(&a, &b, p);
+            let is_ccw = Self::is_ccw(&a.position, &b.position, p);
             if is_ccw == Orientation::Collinear {
                 return true;
             }

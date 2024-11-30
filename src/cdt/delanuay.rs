@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use glam::{DMat3, DVec2, DVec3};
 
-use crate::{edge::Edge, vertex::Vertex};
+use crate::edge::Edge;
 
 use super::cdt::CDT;
 
@@ -19,11 +19,7 @@ impl CDT {
     }
 
     // Edge-flipping routine
-    pub fn flip_edges(
-        &mut self,
-        p: Rc<RefCell<Vertex>>,
-        edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>,
-    ) {
+    pub fn flip_edges(&mut self, edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>) {
         while let Some(e) = edge_stack.pop_front() {
             {
                 let e_borrowed = e.borrow();
@@ -46,16 +42,8 @@ impl CDT {
                 };
                 let neighbor_face = neighbor_face.borrow();
 
-                let o = neighbor_face
-                    .vertices
-                    .iter()
-                    .find(|&x| {
-                        let x = x.borrow();
-                        x.index != e_borrowed.a.borrow().index
-                            && x.index != e_borrowed.b.borrow().index
-                    })
-                    .unwrap()
-                    .borrow();
+                let o_vertex = neighbor_face.opposite_vertex(&e_borrowed);
+                let o = o_vertex.borrow();
                 let is_delanuay = Self::is_delaunay(
                     face.vertices[0].borrow().position,
                     face.vertices[1].borrow().position,

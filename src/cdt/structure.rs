@@ -1,15 +1,13 @@
 use std::{cell::RefCell, rc::Rc};
 
+use glam::DVec2;
+
 use crate::{edge::Edge, face::Face, sym_edge::SymEdge, vertex::Vertex};
 
 use super::cdt::CDT;
 
 impl CDT {
     pub fn add_face(&mut self, vertices: [Rc<RefCell<Vertex>>; 3]) -> Rc<RefCell<Face>> {
-        println!(
-            "Adding face {:?}",
-            vertices.clone().map(|v| v.borrow().index)
-        );
         let edges = (0..vertices.len())
             .map(|i| {
                 let a = vertices[i].clone();
@@ -23,8 +21,10 @@ impl CDT {
             })
             .collect::<Vec<_>>();
 
+        self.edges.extend(edges.clone());
+
         let face = Rc::new(RefCell::new(Face {
-            id: self.faces.len(),
+            id: self.face_id_counter,
             vertices,
             edges: [edges[0].clone(), edges[1].clone(), edges[2].clone()],
         }));
@@ -40,14 +40,14 @@ impl CDT {
 
         self.faces.push(face.clone());
 
+        self.face_id_counter += 1;
+
+        self.faces_by_ids.insert(face.borrow().id, face.clone());
+
         face.clone()
     }
 
     pub fn remove_face(&mut self, face: Rc<RefCell<Face>>) {
-        println!(
-            "Removing face {:?}",
-            face.borrow().vertex_indices().to_vec()
-        );
         let face = face.borrow();
         let face_edges = face.edge_indices();
         let face_vertices = face.vertex_indices();
@@ -67,6 +67,20 @@ impl CDT {
                 .unwrap()
                 .retain(|x| x.borrow().face.borrow().id != face.id);
         }
+
+        // Remove face from faces_by_ids
+        self.faces_by_ids.remove(&face.id);
+    }
+
+    pub fn add_vertex(&mut self, position: DVec2, constraints: usize) -> Rc<RefCell<Vertex>> {
+        let vertex = Vertex {
+            position,
+            index: self.vertices.len(),
+            constraints: constraints,
+        };
+        let vertex = Rc::new(RefCell::new(vertex));
+        self.vertices.push(vertex.clone());
+        vertex
     }
 
     pub fn build_symedges_for_face(&mut self, face: Rc<RefCell<Face>>) -> Result<(), String> {
@@ -168,6 +182,8 @@ impl CDT {
         for vertex in vertices {
             self.build_rot_pointers_for_vertex_sym_edges(vertex);
         }
+
+        println!("Number of faces: {}", self.faces.len());
 
         Ok(())
     }

@@ -20,27 +20,7 @@
           "kind": "bin"
         }
       },
-      "args": [],
-      "cwd": "${workspaceFolder}"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug unit tests in executable 'cdt'",
-      "cargo": {
-        "args": [
-          "test",
-          "--no-run",
-          "--bin=cdt",
-          "--package=cdt",
-          "--features=debug_refcell"
-        ],
-        "filter": {
-          "name": "cdt",
-          "kind": "bin"
-        }
-      },
-      "args": [],
+      "args": ["./models/model.glb", "./models/output.obj"], // Add your run arguments here
       "cwd": "${workspaceFolder}"
     }
   ]
