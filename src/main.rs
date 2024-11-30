@@ -2,7 +2,6 @@ use cdt::cdt::CDT;
 use glam::DVec2;
 use std::io::{self, BufRead};
 
-
 pub mod cdt;
 pub mod edge;
 pub mod face;
@@ -43,6 +42,18 @@ fn main() {
     cdt.build_sym_edges().unwrap();
 
     cdt.insert_constraint([DVec2 { x: 0., y: 0. }].to_vec(), 0);
+
+    cdt.insert_constraint([DVec2 { x: 0.5, y: 0.5 }].to_vec(), 0);
+
+    cdt.insert_constraint([DVec2 { x: -0.5, y: -0.5 }].to_vec(), 0);
+
+    // cdt.insert_constraint([DVec2 { x: 0.5, y: 0. }].to_vec(), 0);
+
+    // cdt.insert_constraint([DVec2 { x: -0.5, y: 0. }].to_vec(), 0);
+
+    // cdt.insert_constraint([DVec2 { x: 0., y: 0.5 }].to_vec(), 0);
+
+    // cdt.insert_constraint([DVec2 { x: 0., y: -0.5 }].to_vec(), 0);
 
     cdt.export_to_obj(&output_path);
 }

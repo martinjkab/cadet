@@ -115,8 +115,8 @@ impl CDT {
         let face_2 = sym_edge.borrow().neighbor_face().unwrap();
 
         // Remove the old faces
-        // self.remove_face(face_1.clone());
-        // self.remove_face(face_2.clone());
+        self.remove_face(face_1.clone());
+        self.remove_face(face_2.clone());
 
         // Get the edges that are diffferent from e
         let face_1_edges = face_1.borrow().edges.clone();
