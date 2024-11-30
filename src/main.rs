@@ -141,6 +141,21 @@ impl std::fmt::Debug for SymEdge {
     }
 }
 
+trait SymmetricCompare {
+    fn symmetric_compare(&self, other: &Self) -> bool;
+    fn inverse_compare(&self, other: &Self) -> bool;
+}
+
+impl SymmetricCompare for (usize, usize) {
+    fn symmetric_compare(&self, other: &(usize, usize)) -> bool {
+        self == other || self.inverse_compare(other)
+    }
+
+    fn inverse_compare(&self, other: &(usize, usize)) -> bool {
+        self == &(other.1, other.0)
+    }
+}
+
 impl SymEdge {
     pub fn bare_to_string(&self) -> String {
         format!(
@@ -152,7 +167,14 @@ impl SymEdge {
     }
 
     pub fn neighbor(&self) -> Option<Rc<RefCell<SymEdge>>> {
-        self.nxt.clone()?.borrow().rot.clone()
+        let neighbor = self.nxt.clone()?.borrow().rot.clone()?;
+        let edge_indices = self.edge.borrow().edge_indices();
+        let neighbor_edge_indices = neighbor.borrow().edge.borrow().edge_indices();
+        let is_inverse = edge_indices.symmetric_compare(&neighbor_edge_indices);
+        if is_inverse {
+            return Some(neighbor);
+        }
+        None
     }
 
     pub fn neighbor_face(&self) -> Option<Rc<RefCell<Face>>> {
@@ -319,96 +341,113 @@ impl CDT {
         Ok(())
     }
 
+    fn build_symedges_for_face(&mut self, face: Rc<RefCell<Face>>) -> Result<(), String> {
+        let mut face_symedges = Vec::new();
+
+        for (i, edge) in face.borrow().edges.iter().enumerate() {
+            let vertex = face.borrow().vertices[i].clone();
+
+            // Create a new SymEdge
+            let sym = Rc::new(RefCell::new(SymEdge {
+                vertex: vertex.clone(),
+                edge: edge.clone(),
+                face: face.clone(),
+                nxt: None,
+                rot: None,
+            }));
+            face_symedges.push(sym.clone());
+
+            // Track SymEdges per vertex
+            self.sym_edges_by_vertices
+                .entry(vertex.borrow().index)
+                .or_default()
+                .push(sym.clone());
+
+            // Track SymEdges per edge
+            self.sym_edges_by_edges
+                .entry((
+                    edge.borrow().a.borrow().index,
+                    edge.borrow().b.borrow().index,
+                ))
+                .insert_entry(sym.clone());
+        }
+
+        // Link `nxt` pointers within the face
+        for i in 0..3 {
+            let nxt = face_symedges[(i + 1) % 3].clone();
+            face_symedges[i].borrow_mut().nxt = Some(nxt);
+        }
+
+        Ok(())
+    }
+
+    fn build_rot_pointers_for_vertex_sym_edges(&mut self, vertex: Rc<RefCell<Vertex>>) {
+        let sym_edges = self
+            .sym_edges_by_vertices
+            .get(&vertex.borrow().index)
+            .unwrap();
+        let mut angle_to_sym_edges = std::vec::Vec::new();
+        //Iterate over the symmetrical edges
+        for sym in sym_edges {
+            let sym_ref = sym.borrow();
+            let edge = sym_ref.edge.borrow();
+            let other_vertex = if edge.a.borrow().index == vertex.borrow().index {
+                edge.b.borrow()
+            } else {
+                edge.a.borrow()
+            };
+
+            let angle = (other_vertex.position - vertex.borrow().position).to_angle();
+
+            angle_to_sym_edges.push((angle, sym.clone()));
+        }
+
+        //Sort by angle
+        angle_to_sym_edges.sort_by(|a, b| b.0.partial_cmp(&a.0).unwrap());
+
+        println!(
+            "Angle to SymEdges ({:?}): {:?}",
+            vertex.borrow().index,
+            angle_to_sym_edges
+                .iter()
+                .map(|(a, b)| (a, b.borrow().edge.borrow().edge_indices()))
+                .collect::<Vec<_>>()
+        );
+
+        if angle_to_sym_edges.len() < 2 {
+            return;
+        }
+
+        //Link the `rot` pointers to the first sym that is counter-clockwise
+        for i in 0..angle_to_sym_edges.len() {
+            let current = angle_to_sym_edges[i].1.clone();
+            let next = angle_to_sym_edges[(i + 1) % angle_to_sym_edges.len()]
+                .1
+                .clone();
+
+            current.borrow_mut().rot = Some(next.clone());
+        }
+    }
+
     fn build_sym_edges(&mut self) -> Result<(), String> {
         self.validate_faces()?;
 
         // Create SymEdges for each face
-        for face_ref in self.faces.iter() {
-            let face = face_ref.borrow();
-            let mut face_symedges = Vec::new();
-            // let mut face_symedges_other = Vec::new();
-
-            for (i, edge) in face.edges.iter().enumerate() {
-                let vertex = face.vertices[i].clone();
-
-                // Create a new SymEdge
-                let sym = Rc::new(RefCell::new(SymEdge {
-                    vertex: vertex.clone(),
-                    edge: edge.clone(),
-                    face: face_ref.clone(),
-                    nxt: None,
-                    rot: None,
-                }));
-                face_symedges.push(sym.clone());
-
-                // Track SymEdges per vertex
-                self.sym_edges_by_vertices
-                    .entry(vertex.borrow().index)
-                    .or_default()
-                    .push(sym.clone());
-
-                // Track SymEdges per edge
-                self.sym_edges_by_edges
-                    .entry((
-                        edge.borrow().a.borrow().index,
-                        edge.borrow().b.borrow().index,
-                    ))
-                    .insert_entry(sym.clone());
-            }
-
-            // Link `nxt` pointers within the face
-            for i in 0..3 {
-                let nxt = face_symedges[(i + 1) % 3].clone();
-                face_symedges[i].borrow_mut().nxt = Some(nxt);
-            }
+        let faces = self.faces.iter().cloned().collect::<Vec<_>>();
+        for face_ref in faces {
+            self.build_symedges_for_face(face_ref)?;
         }
 
         // Step 2: Link `rot` pointers between symmetrical SymEdges
         // based on the vertex they share
+        let vertices = self
+            .sym_edges_by_vertices
+            .keys()
+            .map(|index| self.vertices[*index].clone())
+            .collect::<Vec<_>>();
 
-        for (index, sym_edges) in self.sym_edges_by_vertices.iter() {
-            let vertex = self.vertices[*index].borrow();
-            let mut angle_to_sym_edges = std::vec::Vec::new();
-            //Iterate over the symmetrical edges
-            for sym in sym_edges {
-                let sym_ref = sym.borrow();
-                let edge = sym_ref.edge.borrow();
-                let other_vertex = if edge.a.borrow().index == *index {
-                    edge.b.borrow()
-                } else {
-                    edge.a.borrow()
-                };
-
-                let angle = (other_vertex.position - vertex.position).to_angle();
-
-                angle_to_sym_edges.push((angle, sym.clone()));
-            }
-
-            //Sort by angle
-            angle_to_sym_edges.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap());
-
-            println!(
-                "Angle to SymEdges ({:?}): {:?}",
-                vertex.index,
-                angle_to_sym_edges
-                    .iter()
-                    .map(|(a, b)| (a, b.borrow().edge.borrow().edge_indices()))
-                    .collect::<Vec<_>>()
-            );
-
-            if angle_to_sym_edges.len() < 2 {
-                continue;
-            }
-
-            //Link the `rot` pointers to the first sym that is counter-clockwise
-            for i in 0..angle_to_sym_edges.len() {
-                let current = angle_to_sym_edges[i].1.clone();
-                let next = angle_to_sym_edges[(i + 1) % angle_to_sym_edges.len()]
-                    .1
-                    .clone();
-
-                current.borrow_mut().rot = Some(next.clone());
-            }
+        for vertex in vertices {
+            self.build_rot_pointers_for_vertex_sym_edges(vertex);
         }
 
         println!("SymEdges:");
@@ -434,7 +473,7 @@ impl CDT {
             let vertex = match locate_result {
                 LocateResult::Vertex(v) => v,
                 LocateResult::Edge(edge) => self.insert_point_on_edge(point.clone(), edge),
-                LocateResult::Face(face) => Self::insert_point_in_face(point.clone(), face),
+                LocateResult::Face(face) => self.insert_point_in_face(point.clone(), face),
                 LocateResult::None => {
                     continue;
                 }
@@ -444,12 +483,12 @@ impl CDT {
             vertex_list.push(vertex);
         }
 
-        // Step 4: Insert segments between successive vertices
-        for i in 0..vertex_list.len() - 1 {
-            let v = vertex_list[i].clone();
-            let vs = vertex_list[i + 1].clone();
-            Self::insert_segment(v, vs, constraint_id);
-        }
+        // // Step 4: Insert segments between successive vertices
+        // for i in 0..vertex_list.len() - 1 {
+        //     let v = vertex_list[i].clone();
+        //     let vs = vertex_list[i + 1].clone();
+        //     Self::insert_segment(v, vs, constraint_id);
+        // }
     }
 
     fn ccw(a: &Vertex, b: &Vertex, c: &Vertex) -> f64 {
@@ -614,11 +653,11 @@ impl CDT {
     }
 
     // Edge-flipping routine
-    fn flip_edges(&mut self, p: Vertex, edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>) {
+    fn flip_edges(&mut self, p: Rc<RefCell<Vertex>>, edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>) {
         while let Some(e) = edge_stack.pop_front() {
             let e_borrowed = e.borrow();
             if !e_borrowed.crep.is_empty() {
-                continue; // Skip constrained edges
+                continue;
             }
 
             // Get edge endpoints
@@ -628,16 +667,19 @@ impl CDT {
             let sym_edge = self.sym_edges_by_edges.get(&(a.index, b.index)).unwrap();
             let face = sym_edge.borrow().face.clone();
 
-            println!(
-                "Checking edge: {:?}, face vertices: {:?}",
-                e.borrow().edge_indices(),
-                face.borrow().vertex_indices()
-            );
-
             let o = face.borrow().opposite_vertex(&e_borrowed);
             let o = o.borrow();
+            let is_delanuay =
+                Self::is_delaunay(p.borrow().position, a.position, b.position, o.position);
 
-            if Self::is_delaunay(p.position, a.position, b.position, o.position) {
+            println!(
+                "Checking edge: {:?}, face vertices: {:?}, is Delaunay: {}",
+                e.borrow().edge_indices(),
+                face.borrow().vertex_indices(),
+                is_delanuay
+            );
+
+            if is_delanuay {
                 continue; // Skip if the edge is already Delaunay
             }
 
@@ -694,8 +736,13 @@ impl CDT {
 
         // Update the faces
         f1.borrow_mut().replace_edge(edge.clone(), new_edge.clone());
-
         f2.borrow_mut().replace_edge(edge.clone(), new_edge.clone());
+
+        println!(
+            "new f1 vertices: {:?}, new f2 vertices: {:?}",
+            f1.borrow().vertex_indices(),
+            f2.borrow().vertex_indices()
+        );
     }
 
     fn insert_point_on_edge(
@@ -778,16 +825,108 @@ impl CDT {
         let mut edge_stack = VecDeque::new();
         edge_stack.extend(all_edges);
 
-        self.flip_edges(point, &mut edge_stack);
+        self.flip_edges(v.clone(), &mut edge_stack);
 
         v
     }
 
-    fn insert_point_in_face(point: Vertex, face: Rc<RefCell<Face>>) -> Rc<RefCell<Vertex>> {
-        todo!()
+    fn insert_point_in_face(&mut self, v: Vertex, face: Rc<RefCell<Face>>) -> Rc<RefCell<Vertex>> {
+        //New vertex
+        let v = Vertex {
+            position: v.position,
+            index: self.vertices.len(),
+            constraints: 1,
+        };
+        let v = Rc::new(RefCell::new(v));
+        self.vertices.push(v.clone());
+        {
+            // New edges
+            let face_borrowed = face.borrow();
+
+            // New faces
+            let faces_count = self.faces.len();
+            let new_faces: Vec<_> = face_borrowed
+                .edges
+                .iter()
+                .enumerate()
+                .map(|(i, edge)| {
+                    let vertices = [edge.borrow().a.clone(), edge.borrow().b.clone(), v.clone()];
+                    let mut edges = (1..3)
+                        .map(|i| {
+                            let a = vertices[i].clone();
+                            let b = vertices[(i + 1) % 3].clone();
+                            let edge = Edge {
+                                a: a.clone(),
+                                b: b.clone(),
+                                crep: HashSet::new(),
+                            };
+                            Rc::new(RefCell::new(edge))
+                        })
+                        .collect::<Vec<_>>();
+                    edges.insert(0, edge.clone());
+                    self.edges.extend(edges.clone());
+                    let face = Face {
+                        id: faces_count + i,
+                        vertices: vertices,
+                        edges: [edges[0].clone(), edges[1].clone(), edges[2].clone()],
+                    };
+                    face
+                })
+                .map(|face| Rc::new(RefCell::new(face)))
+                .collect();
+
+            println!(
+                "New faces: {:?}",
+                new_faces
+                    .iter()
+                    .map(|x| x.borrow().edge_indices())
+                    .collect::<Vec<_>>()
+            );
+
+            self.faces.extend(new_faces.clone());
+            self.faces.retain(|x| x.borrow().id != face_borrowed.id);
+
+            for face in new_faces.iter() {
+                self.build_symedges_for_face(face.clone()).unwrap();
+            }
+
+            for face in new_faces.iter() {
+                let vertices = face.borrow().vertices.clone();
+                for vertex in vertices.iter() {
+                    self.build_rot_pointers_for_vertex_sym_edges(vertex.clone());
+                }
+            }
+        }
+
+        println!("SymEdges:");
+        let mut sym_edges = self.sym_edges_by_edges.values().collect::<Vec<_>>();
+        sym_edges.sort_by(|a, b| {
+            a.borrow()
+                .face
+                .borrow()
+                .vertex_indices()
+                .cmp(&b.borrow().face.borrow().vertex_indices())
+                .then(
+                    a.borrow()
+                        .edge
+                        .borrow()
+                        .edge_indices()
+                        .cmp(&b.borrow().edge.borrow().edge_indices()),
+                )
+        });
+        for sym_edge in sym_edges {
+            sym_edge.borrow().pretty_print();
+        }
+
+        let mut edge_stack = VecDeque::new();
+        edge_stack.extend(face.borrow().edges.clone());
+
+        self.flip_edges(v.clone(), &mut edge_stack);
+
+        v
     }
 
-    fn insert_segment(v: Rc<RefCell<Vertex>>, vs: Rc<RefCell<Vertex>>, constraint_id: usize) {}
+    // fn insert_segment(v: Rc<RefCell<Vertex>>, vs: Rc<RefCell<Vertex>>, constraint_id: usize) {}
 }
 
 #[derive(Debug)]
@@ -810,15 +949,24 @@ fn main() {
     println!("{}", std::env::current_dir().unwrap().display());
     let mut cdt = CDT::from_gltf("C:/Projects/Study/cdt/models/model.glb");
     cdt.build_sym_edges().unwrap();
-    cdt.insert_point_on_edge(
+    // cdt.insert_point_on_edge(
+    //     Vertex {
+    //         position: DVec2 { x: 0.0, y: 0.0 },
+    //         index: 0,
+    //         constraints: 0,
+    //     },
+    //     cdt.edges
+    //         .iter()
+    //         .find(|e| e.borrow().a.borrow().index == 3)
+    //         .unwrap()
+    //         .clone(),
+    // );
+    cdt.insert_point_in_face(
         Vertex {
-            position: DVec2 { x: 0.0, y: 0.0 },
+            position: DVec2 { x: 0.5, y: 0.5 },
             index: 0,
             constraints: 0,
         },
-        cdt.edges
-            .iter().find(|e| e.borrow().a.borrow().index == 3)
-            .unwrap()
-            .clone(),
+        cdt.faces[0].clone(),
     );
 }
