@@ -1,7 +1,5 @@
-
-use cdt::CDT;
+use cdt::cdt::CDT;
 use glam::DVec2;
-
 
 use crate::vertex::Vertex;
 
@@ -33,10 +31,11 @@ fn main() {
     // );
     cdt.insert_point_in_face(
         Vertex {
-            position: DVec2 { x: 0.5, y: 0.5 },
+            position: DVec2 { x: 0.1, y: 0.5 },
             index: 0,
             constraints: 0,
         },
         cdt.faces[0].clone(),
     );
+    cdt.export_to_obj("C:/Projects/Study/cdt/models/output.obj");
 }

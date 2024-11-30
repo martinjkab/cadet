@@ -37,25 +37,4 @@ impl Face {
             .cloned()
             .expect("Edge not found in face")
     }
-
-    pub fn replace_edge(&mut self, old_edge: Rc<RefCell<Edge>>, new_edge: Rc<RefCell<Edge>>) {
-        for i in 0..3 {
-            if self.edges[i].borrow().edge_indices() == old_edge.borrow().edge_indices() {
-                self.edges[i] = new_edge.clone();
-                break;
-            }
-        }
-
-        // Update vertices
-        let old_edge = old_edge.borrow();
-        let new_edge = new_edge.borrow();
-
-        for i in 0..3 {
-            if self.vertices[i].borrow().index == old_edge.a.borrow().index {
-                self.vertices[i] = new_edge.a.clone();
-            } else if self.vertices[i].borrow().index == old_edge.b.borrow().index {
-                self.vertices[i] = new_edge.b.clone();
-            }
-        }
-    }
 }
