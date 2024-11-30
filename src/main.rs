@@ -1,16 +1,7 @@
-use std::{
-    cell::RefCell,
-    collections::{HashMap, HashSet, VecDeque},
-    rc::Rc,
-};
 
 use cdt::CDT;
-use edge::Edge;
-use face::Face;
-use glam::{DVec2, DVec4};
+use glam::DVec2;
 
-use rand::seq::IteratorRandom;
-use sym_edge::SymEdge;
 
 use crate::vertex::Vertex;
 
