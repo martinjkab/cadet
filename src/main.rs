@@ -433,7 +433,7 @@ impl CDT {
         self.validate_faces()?;
 
         // Create SymEdges for each face
-        let faces = self.faces.iter().cloned().collect::<Vec<_>>();
+        let faces = self.faces.to_vec();
         for face_ref in faces {
             self.build_symedges_for_face(face_ref)?;
         }
@@ -865,12 +865,12 @@ impl CDT {
                         .collect::<Vec<_>>();
                     edges.insert(0, edge.clone());
                     self.edges.extend(edges.clone());
-                    let face = Face {
+                    
+                    Face {
                         id: faces_count + i,
-                        vertices: vertices,
+                        vertices,
                         edges: [edges[0].clone(), edges[1].clone(), edges[2].clone()],
-                    };
-                    face
+                    }
                 })
                 .map(|face| Rc::new(RefCell::new(face)))
                 .collect();
