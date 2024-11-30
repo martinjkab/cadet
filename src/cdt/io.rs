@@ -1,8 +1,8 @@
-use std::{cell::RefCell, collections::HashSet, io::Write, rc::Rc};
+use std::{cell::RefCell, io::Write, rc::Rc};
 
 use glam::DVec2;
 
-use crate::{edge::Edge, face::Face, vertex::Vertex};
+use crate::vertex::Vertex;
 
 use super::cdt::CDT;
 

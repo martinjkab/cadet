@@ -39,8 +39,8 @@ impl CDT {
             // Step 2: Handle the locate result
             let vertex = match locate_result {
                 LocateResult::Vertex(v) => v,
-                LocateResult::Edge(edge) => self.insert_point_on_edge(point.clone(), edge),
-                LocateResult::Face(face) => self.insert_point_in_face(point.clone(), face),
+                LocateResult::Edge(edge) => self.insert_point_on_edge(*point, edge),
+                LocateResult::Face(face) => self.insert_point_in_face(*point, face),
                 LocateResult::None => {
                     continue;
                 }

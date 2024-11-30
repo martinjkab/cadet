@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use glam::DVec2;
 use rand::seq::IteratorRandom;
 
-use crate::{face::Face, locate_result::LocateResult, orientation::Orientation, vertex::Vertex};
+use crate::{face::Face, locate_result::LocateResult, orientation::Orientation};
 
 use super::cdt::CDT;
 

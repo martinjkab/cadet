@@ -2,7 +2,6 @@ use cdt::cdt::CDT;
 use glam::DVec2;
 use std::io::{self, BufRead};
 
-use crate::vertex::Vertex;
 
 pub mod cdt;
 pub mod edge;

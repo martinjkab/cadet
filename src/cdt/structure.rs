@@ -76,7 +76,7 @@ impl CDT {
         let vertex = Vertex {
             position,
             index: self.vertices.len(),
-            constraints: constraints,
+            constraints,
         };
         let vertex = Rc::new(RefCell::new(vertex));
         self.vertices.push(vertex.clone());
