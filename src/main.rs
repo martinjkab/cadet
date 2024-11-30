@@ -15,31 +15,12 @@ pub mod vertex;
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
     println!("{}", std::env::current_dir().unwrap().display());
-    let mut cdt = CDT::from_gltf("C:/Projects/Study/cdt/models/model.glb");
+    let mut cdt = CDT::from_gltf("./models/model.glb");
     cdt.build_sym_edges().unwrap();
-    // cdt.insert_point_on_edge(
-    //     Vertex {
-    //         position: DVec2 { x: 0.0, y: 0.0 },
-    //         index: 0,
-    //         constraints: 0,
-    //     },
-    //     cdt.edges
-    //         .iter()
-    //         .find(|e| e.borrow().a.borrow().index == 3)
-    //         .unwrap()
-    //         .clone(),
-    // );
-    // cdt.insert_point_in_face(
-    //     Vertex {
-    //         position: DVec2 { x: 0.25, y: -0.5 },
-    //         index: 0,
-    //         constraints: 0,
-    //     },
-    //     cdt.faces[1].clone(),
-    // );
+
     cdt.insert_constraint(
         [Vertex {
-            position: DVec2 { x: -0.5, y: -0.5 },
+            position: DVec2 { x: 0.5, y: 0.5 },
             index: 0,
             constraints: 0,
         }]
@@ -47,15 +28,5 @@ fn main() {
         0,
     );
 
-    // cdt.insert_constraint(
-    //     [Vertex {
-    //         position: DVec2 { x: 0.75, y: 0.5 },
-    //         index: 0,
-    //         constraints: 0,
-    //     }]
-    //     .to_vec(),
-    //     1,
-    // );
-
-    cdt.export_to_obj("C:/Projects/Study/cdt/models/output.obj");
+    cdt.export_to_obj("./models/output.obj");
 }

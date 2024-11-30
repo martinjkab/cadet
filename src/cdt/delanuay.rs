@@ -91,17 +91,6 @@ impl CDT {
             None => return,
         };
 
-        println!(
-            "f1 vertices: {:?}, f2 vertices: {:?}",
-            f1.borrow().vertex_indices(),
-            f2.borrow().vertex_indices()
-        );
-        println!(
-            "f1 edges: {:?}, f2 edges: {:?}",
-            f1.borrow().edge_indices(),
-            f2.borrow().edge_indices()
-        );
-
         // Az e élt nem tartalmazó csúcsok mindkét háromszögben
         let v1 = f1.borrow().opposite_vertex(&edge.borrow());
         let v2 = f2.borrow().opposite_vertex(&edge.borrow());
@@ -125,27 +114,16 @@ impl CDT {
         self.remove_face(f2.clone());
 
         // Create two completely new faces
-        let new_f1 = self.add_triangle([
+        self.add_face([
             new_edge_borrowed.b.clone(),
             new_edge_borrowed.a.clone(),
             edge.borrow().a.clone(),
         ]);
 
-        let new_f2 = self.add_triangle([
+        self.add_face([
             new_edge_borrowed.a.clone(),
             new_edge_borrowed.b.clone(),
             edge.borrow().b.clone(),
         ]);
-
-        println!(
-            "new f1 vertices: {:?}, new f2 vertices: {:?}",
-            new_f1.borrow().vertex_indices(),
-            new_f2.borrow().vertex_indices()
-        );
-        println!(
-            "new f1 edges: {:?}, new f2 edges: {:?}",
-            new_f1.borrow().edge_indices(),
-            new_f2.borrow().edge_indices()
-        );
     }
 }

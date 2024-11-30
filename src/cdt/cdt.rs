@@ -23,7 +23,7 @@ impl CDT {
     pub fn insert_constraint(
         &mut self,
         constraint_points: Vec<Vertex>, // List of points in the constraint
-        constraint_id: usize,           // ID of the constraint
+        _constraint_id: usize,          // ID of the constraint
     ) {
         println!("Inserting constraint: {:?}", constraint_points);
         let mut vertex_list = Vec::new();
@@ -157,63 +157,22 @@ impl CDT {
         };
         let v = Rc::new(RefCell::new(v));
         self.vertices.push(v.clone());
+
         {
+            self.remove_face(face.clone());
             // New edges
             let face_borrowed = face.borrow();
 
             // New faces
-            let faces_count = self.faces.len();
             let new_faces: Vec<_> = face_borrowed
                 .edges
                 .iter()
-                .enumerate()
-                .map(|(i, edge)| {
+                .map(|edge| {
                     let vertices = [edge.borrow().a.clone(), edge.borrow().b.clone(), v.clone()];
-                    let mut edges = (1..3)
-                        .map(|i| {
-                            let a = vertices[i].clone();
-                            let b = vertices[(i + 1) % 3].clone();
-                            let edge = Edge {
-                                a: a.clone(),
-                                b: b.clone(),
-                                crep: HashSet::new(),
-                            };
-                            Rc::new(RefCell::new(edge))
-                        })
-                        .collect::<Vec<_>>();
-                    edges.insert(0, edge.clone());
-                    self.edges.extend(edges.clone());
 
-                    Face {
-                        id: faces_count + i,
-                        vertices,
-                        edges: [edges[0].clone(), edges[1].clone(), edges[2].clone()],
-                    }
+                    self.add_face(vertices)
                 })
-                .map(|face| Rc::new(RefCell::new(face)))
                 .collect();
-
-            println!(
-                "New faces: {:?}",
-                new_faces
-                    .iter()
-                    .map(|x| x.borrow().edge_indices())
-                    .collect::<Vec<_>>()
-            );
-
-            self.faces.extend(new_faces.clone());
-            self.faces.retain(|x| x.borrow().id != face_borrowed.id);
-
-            for face in new_faces.iter() {
-                self.build_symedges_for_face(face.clone()).unwrap();
-            }
-
-            for face in new_faces.iter() {
-                let vertices = face.borrow().vertices.clone();
-                for vertex in vertices.iter() {
-                    self.build_rot_pointers_for_vertex_sym_edges(vertex.clone());
-                }
-            }
         }
 
         let mut edge_stack = VecDeque::new();

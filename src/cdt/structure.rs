@@ -5,7 +5,11 @@ use crate::{edge::Edge, face::Face, sym_edge::SymEdge, vertex::Vertex};
 use super::cdt::CDT;
 
 impl CDT {
-    pub fn add_triangle(&mut self, vertices: [Rc<RefCell<Vertex>>; 3]) -> Rc<RefCell<Face>> {
+    pub fn add_face(&mut self, vertices: [Rc<RefCell<Vertex>>; 3]) -> Rc<RefCell<Face>> {
+        println!(
+            "Adding face {:?}",
+            vertices.clone().map(|v| v.borrow().index)
+        );
         let edges = (0..vertices.len())
             .map(|i| {
                 let a = vertices[i].clone();
@@ -40,6 +44,10 @@ impl CDT {
     }
 
     pub fn remove_face(&mut self, face: Rc<RefCell<Face>>) {
+        println!(
+            "Removing face {:?}",
+            face.borrow().vertex_indices().to_vec()
+        );
         let face = face.borrow();
         let face_edges = face.edge_indices();
         let face_vertices = face.vertex_indices();
