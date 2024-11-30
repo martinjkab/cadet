@@ -55,7 +55,7 @@ impl CDT {
         // Remove face from sym_edges_by_vertices
         for vertex in face_vertices.iter() {
             self.sym_edges_by_vertices
-                .get_mut(&vertex)
+                .get_mut(vertex)
                 .unwrap()
                 .retain(|x| x.borrow().face.borrow().id != face.id);
         }

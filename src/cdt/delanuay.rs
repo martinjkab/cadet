@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use glam::{DMat3, DVec2, DVec3};
 
-use crate::{edge::Edge, face::Face, vertex::Vertex};
+use crate::{edge::Edge, vertex::Vertex};
 
 use super::cdt::CDT;
 
