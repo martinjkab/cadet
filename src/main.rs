@@ -660,6 +660,16 @@ impl CDT {
                 continue;
             }
 
+            //If doesnt have neighbor face, skip
+            let sym_edge = self
+                .sym_edges_by_edges
+                .get(&(e_borrowed.edge_indices()))
+                .unwrap();
+
+            if sym_edge.borrow().neighbor_face().is_none() {
+                continue;
+            }
+
             // Get edge endpoints
             let a = e_borrowed.a.borrow();
             let b = e_borrowed.b.borrow();
@@ -865,7 +875,7 @@ impl CDT {
                         .collect::<Vec<_>>();
                     edges.insert(0, edge.clone());
                     self.edges.extend(edges.clone());
-                    
+
                     Face {
                         id: faces_count + i,
                         vertices,
