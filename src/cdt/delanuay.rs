@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use glam::{DMat3, DVec2, DVec3};
 
-use crate::{edge::Edge, vertex::Vertex};
+use crate::{edge::Edge, face::Face, vertex::Vertex};
 
 use super::cdt::CDT;
 
@@ -15,8 +15,7 @@ impl CDT {
             DVec3::new(c.x - d.x, c.y - d.y, (c - d).dot(c - d)),
         );
         let det = matrix.determinant();
-        println!("Determinant: {}", det);
-        det <= 0.0 // True if the point is not inside the circumcircle
+        det >= 0.0 // True if the point is not inside the circumcircle
     }
 
     // Edge-flipping routine
@@ -64,22 +63,6 @@ impl CDT {
                     o.position,
                 );
 
-                println!(
-                    "Checking is Delaunay: {:?}, {:?}, {:?}, {:?}, {}",
-                    face.vertices[0].borrow().index,
-                    face.vertices[1].borrow().index,
-                    face.vertices[2].borrow().index,
-                    o.index,
-                    is_delanuay
-                );
-
-                println!(
-                    "Checking edge: {:?}, face vertices: {:?}, is Delaunay: {}",
-                    e.borrow().edge_indices(),
-                    face.vertex_indices(),
-                    is_delanuay
-                );
-
                 if is_delanuay {
                     continue; // Skip if the edge is already Delaunay
                 }
@@ -99,14 +82,11 @@ impl CDT {
     }
 
     fn flip_edge(&mut self, edge: Rc<RefCell<Edge>>) {
-        let sym_edge = self
-            .sym_edges_by_edges
-            .get(&(edge.borrow().edge_indices()))
-            .unwrap();
-        let sym_edge_borrowed = sym_edge.borrow();
+        let edge_indices = edge.borrow().edge_indices();
+        let sym_edge = self.sym_edges_by_edges.get(&edge_indices).unwrap();
 
-        let f1 = sym_edge_borrowed.face.clone();
-        let f2 = match sym_edge_borrowed.neighbor_face() {
+        let f1 = sym_edge.borrow().face.clone();
+        let f2 = match sym_edge.borrow().neighbor_face() {
             Some(face) => face,
             None => return,
         };
@@ -126,38 +106,46 @@ impl CDT {
         let v1 = f1.borrow().opposite_vertex(&edge.borrow());
         let v2 = f2.borrow().opposite_vertex(&edge.borrow());
 
-        let a = edge.borrow().a.clone();
-        let b = edge.borrow().b.clone();
-
         let new_edge = Edge {
             a: v1.clone(),
             b: v2.clone(),
             crep: edge.borrow().crep.clone(),
         };
         let new_edge = Rc::new(RefCell::new(new_edge));
+        let new_edge_borrowed = new_edge.borrow();
 
         println!(
             "Flipping edge: {:?} to {:?}",
             edge.borrow().edge_indices(),
-            new_edge.borrow().edge_indices()
+            new_edge_borrowed.edge_indices()
         );
 
+        // Deleting the old faces
+        self.remove_face(f1.clone());
+        self.remove_face(f2.clone());
+
         // Create two completely new faces
-        // let new_f1 = Face {
-        //     id: self.faces.len(),
-        //     vertices: [a.clone(), v1.clone(), v2.clone()],
-        //     edges: [edge.clone(), new_edge.clone(), sym_edge.clone()],
-        // };
+        let new_f1 = self.add_triangle([
+            new_edge_borrowed.b.clone(),
+            new_edge_borrowed.a.clone(),
+            edge.borrow().a.clone(),
+        ]);
+
+        let new_f2 = self.add_triangle([
+            new_edge_borrowed.a.clone(),
+            new_edge_borrowed.b.clone(),
+            edge.borrow().b.clone(),
+        ]);
 
         println!(
             "new f1 vertices: {:?}, new f2 vertices: {:?}",
-            f1.borrow().vertex_indices(),
-            f2.borrow().vertex_indices()
+            new_f1.borrow().vertex_indices(),
+            new_f2.borrow().vertex_indices()
         );
         println!(
             "new f1 edges: {:?}, new f2 edges: {:?}",
-            f1.borrow().edge_indices(),
-            f2.borrow().edge_indices()
+            new_f1.borrow().edge_indices(),
+            new_f2.borrow().edge_indices()
         );
     }
 }

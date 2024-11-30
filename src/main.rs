@@ -29,13 +29,33 @@ fn main() {
     //         .unwrap()
     //         .clone(),
     // );
-    cdt.insert_point_in_face(
-        Vertex {
-            position: DVec2 { x: 0.5, y: 0.5 },
+    // cdt.insert_point_in_face(
+    //     Vertex {
+    //         position: DVec2 { x: 0.25, y: -0.5 },
+    //         index: 0,
+    //         constraints: 0,
+    //     },
+    //     cdt.faces[1].clone(),
+    // );
+    cdt.insert_constraint(
+        [Vertex {
+            position: DVec2 { x: -0.5, y: -0.5 },
             index: 0,
             constraints: 0,
-        },
-        cdt.faces[0].clone(),
+        }]
+        .to_vec(),
+        0,
     );
+
+    // cdt.insert_constraint(
+    //     [Vertex {
+    //         position: DVec2 { x: 0.75, y: 0.5 },
+    //         index: 0,
+    //         constraints: 0,
+    //     }]
+    //     .to_vec(),
+    //     1,
+    // );
+
     cdt.export_to_obj("C:/Projects/Study/cdt/models/output.obj");
 }

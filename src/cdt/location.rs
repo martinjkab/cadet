@@ -32,8 +32,6 @@ impl CDT {
             }
         }
 
-        println!("Closest face: {:?}", closest_face.borrow().vertex_indices());
-
         // Step 2: Walk - Oriented walk to locate p
         let mut visited = vec![false; self.faces.len()];
 
@@ -68,13 +66,6 @@ impl CDT {
                 let is_point_ccw = Self::is_ccw(&vertex, &next_vertex, p);
                 let is_centroid_ccw = Self::is_ccw(&vertex, &next_vertex, &centroid);
                 let is_separating_edge = is_point_ccw != is_centroid_ccw;
-
-                println!(
-                    "Edge: {:?}, is_point_ccw: {:?}, is_centroid_ccw: {:?}",
-                    edge_borrowed.edge_indices(),
-                    is_point_ccw,
-                    is_centroid_ccw,
-                );
 
                 if is_point_ccw == Orientation::Collinear {
                     return LocateResult::Edge(edge.clone());
