@@ -1,8 +1,8 @@
 use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-use glam::{DMat3, DMat4, DVec2, DVec3, DVec4};
+use glam::{DMat3, DVec2, DVec3};
 
-use crate::{edge::Edge, face::Face, symmetric_compare::SymmetricCompare, vertex::Vertex};
+use crate::{edge::Edge, vertex::Vertex};
 
 use super::cdt::CDT;
 
