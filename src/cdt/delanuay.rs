@@ -1,21 +1,22 @@
 use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
-use glam::{DMat4, DVec2, DVec4};
+use glam::{DMat3, DMat4, DVec2, DVec3, DVec4};
 
-use crate::{edge::Edge, vertex::Vertex};
+use crate::{edge::Edge, face::Face, symmetric_compare::SymmetricCompare, vertex::Vertex};
 
 use super::cdt::CDT;
 
 impl CDT {
     // Check if an edge is Delaunay using the in-circle test
-    pub fn is_delaunay(p: DVec2, a: DVec2, b: DVec2, o: DVec2) -> bool {
-        let matrix = DMat4::from_cols(
-            DVec4::new(p.x, p.y, p.length_squared(), 1.0),
-            DVec4::new(a.x, a.y, a.length_squared(), 1.0),
-            DVec4::new(b.x, b.y, b.length_squared(), 1.0),
-            DVec4::new(o.x, o.y, o.length_squared(), 1.0),
+    fn is_delaunay(a: DVec2, b: DVec2, c: DVec2, d: DVec2) -> bool {
+        let matrix: DMat3 = DMat3::from_cols(
+            DVec3::new(a.x - d.x, a.y - d.y, (a - d).dot(a - d)),
+            DVec3::new(b.x - d.x, b.y - d.y, (b - d).dot(b - d)),
+            DVec3::new(c.x - d.x, c.y - d.y, (c - d).dot(c - d)),
         );
-        matrix.determinant() <= 0.0 // True if the point is not inside the circumcircle
+        let det = matrix.determinant();
+        println!("Determinant: {}", det);
+        det <= 0.0 // True if the point is not inside the circumcircle
     }
 
     // Edge-flipping routine
@@ -25,46 +26,68 @@ impl CDT {
         edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>,
     ) {
         while let Some(e) = edge_stack.pop_front() {
-            let e_borrowed = e.borrow();
-            if !e_borrowed.crep.is_empty() {
-                continue;
-            }
-
-            //If doesnt have neighbor face, skip
-            let sym_edge = self
-                .sym_edges_by_edges
-                .get(&(e_borrowed.edge_indices()))
-                .unwrap();
-
-            // Get edge endpoints
-            let a = e_borrowed.a.borrow();
-            let b = e_borrowed.b.borrow();
-
-            let sym_edge = self.sym_edges_by_edges.get(&(a.index, b.index)).unwrap();
-            let face = sym_edge.borrow().face.clone();
-
-            let o = face.borrow().opposite_vertex(&e_borrowed);
-            let o = o.borrow();
-            let is_delanuay =
-                Self::is_delaunay(p.borrow().position, a.position, b.position, o.position);
-
-            println!(
-                "Checking edge: {:?}, face vertices: {:?}, is Delaunay: {}",
-                e.borrow().edge_indices(),
-                face.borrow().vertex_indices(),
-                is_delanuay
-            );
-
-            if is_delanuay {
-                continue; // Skip if the edge is already Delaunay
-            }
-
             {
-                let face_borrowed = face.borrow();
-                let different_edges = face_borrowed
+                let e_borrowed = e.borrow();
+                if !e_borrowed.crep.is_empty() {
+                    continue;
+                }
+
+                //If doesnt have neighbor face, skip
+                let sym_edge = self
+                    .sym_edges_by_edges
+                    .get(&(e_borrowed.edge_indices()))
+                    .unwrap()
+                    .borrow();
+
+                let face = sym_edge.face.borrow();
+
+                let neighbor_face = match sym_edge.neighbor_face() {
+                    Some(face) => face,
+                    None => continue,
+                };
+                let neighbor_face = neighbor_face.borrow();
+
+                let o = neighbor_face
+                    .vertices
+                    .iter()
+                    .find(|&x| {
+                        let x = x.borrow();
+                        x.index != e_borrowed.a.borrow().index
+                            && x.index != e_borrowed.b.borrow().index
+                    })
+                    .unwrap()
+                    .borrow();
+                let is_delanuay = Self::is_delaunay(
+                    face.vertices[0].borrow().position,
+                    face.vertices[1].borrow().position,
+                    face.vertices[2].borrow().position,
+                    o.position,
+                );
+
+                println!(
+                    "Checking is Delaunay: {:?}, {:?}, {:?}, {:?}, {}",
+                    face.vertices[0].borrow().index,
+                    face.vertices[1].borrow().index,
+                    face.vertices[2].borrow().index,
+                    o.index,
+                    is_delanuay
+                );
+
+                println!(
+                    "Checking edge: {:?}, face vertices: {:?}, is Delaunay: {}",
+                    e.borrow().edge_indices(),
+                    face.vertex_indices(),
+                    is_delanuay
+                );
+
+                if is_delanuay {
+                    continue; // Skip if the edge is already Delaunay
+                }
+
+                let different_edges = face
                     .edges
                     .iter()
-                    .filter(|x| x.borrow().edge_indices() != (a.index, b.index))
+                    .filter(|x| x.borrow().edge_indices() != e_borrowed.edge_indices())
                     .collect::<Vec<_>>();
 
                 edge_stack.push_back(different_edges[0].clone());
@@ -118,6 +141,13 @@ impl CDT {
             edge.borrow().edge_indices(),
             new_edge.borrow().edge_indices()
         );
+
+        // Create two completely new faces
+        // let new_f1 = Face {
+        //     id: self.faces.len(),
+        //     vertices: [a.clone(), v1.clone(), v2.clone()],
+        //     edges: [edge.clone(), new_edge.clone(), sym_edge.clone()],
+        // };
 
         println!(
             "new f1 vertices: {:?}, new f2 vertices: {:?}",
