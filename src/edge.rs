@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
+use glam::DVec2;
+
 use crate::vertex::Vertex;
 
 #[derive(Debug)]

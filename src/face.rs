@@ -28,8 +28,7 @@ impl Face {
 
     pub fn opposite_vertex(&self, edge: &Edge) -> Rc<RefCell<Vertex>> {
         let edge = edge.edge_indices();
-        println!("Edge: {:?}", edge);
-        println!("Vertices: {:?}", self.vertex_indices());
+
         self.vertices
             .iter()
             .find(|vertex| {

@@ -8,7 +8,7 @@ use crate::{face::Face, locate_result::LocateResult, orientation::Orientation};
 use super::cdt::CDT;
 
 impl CDT {
-    pub fn locate_point(&mut self, p: &DVec2) -> LocateResult {
+    pub fn locate_point(&self, p: &DVec2) -> LocateResult {
         // Step 1: Jump - Select a random vertex sample and find the closest one
         let num_vertices = self.faces.len();
         let sample_size = (num_vertices as f64).powf(1.0 / 3.0).ceil() as usize;
@@ -89,6 +89,17 @@ impl CDT {
                     visited.insert(closest_face.borrow().id, true);
                     closest_face = neighbor.clone();
                 } else {
+                    // Check if point lies outside the convex hull
+                    let edge = &closest_face.borrow().edges[edge_index];
+                    let edge_borrowed = edge.borrow();
+                    let is_ccw = Self::is_ccw(
+                        &edge_borrowed.a.borrow().position,
+                        &edge_borrowed.b.borrow().position,
+                        p,
+                    ) == Orientation::CounterClockwise;
+                    if is_ccw {
+                        return LocateResult::None;
+                    }
                     return LocateResult::Face(closest_face.clone());
                 }
             } else {

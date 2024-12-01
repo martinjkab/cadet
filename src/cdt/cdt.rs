@@ -7,8 +7,14 @@ use std::{
 use glam::DVec2;
 
 use crate::{
-    edge::Edge, face::Face, locate_result::LocateResult, orientation::Orientation,
-    sym_edge::SymEdge, symmetric_compare::SymmetricCompare, vertex::Vertex,
+    edge::Edge,
+    face::Face,
+    helper::{intersection_point, is_crossing},
+    locate_result::LocateResult,
+    orientation::Orientation,
+    sym_edge::{self, SymEdge},
+    symmetric_compare::SymmetricCompare,
+    vertex::Vertex,
 };
 
 #[derive(Debug, Default)]
@@ -27,7 +33,7 @@ impl CDT {
     pub fn insert_constraint(
         &mut self,
         constraint_points: Vec<DVec2>, // List of points in the constraint
-        _constraint_id: usize,         // ID of the constraint
+        constraint_id: usize,          // ID of the constraint
     ) {
         println!("Inserting constraint: {:?}", constraint_points);
         let mut vertex_list = Vec::new();
@@ -50,12 +56,12 @@ impl CDT {
             vertex_list.push(vertex);
         }
 
-        // // Step 4: Insert segments between successive vertices
-        // for i in 0..vertex_list.len() - 1 {
-        //     let v = vertex_list[i].clone();
-        //     let vs = vertex_list[i + 1].clone();
-        //     Self::insert_segment(v, vs, constraint_id);
-        // }
+        // Step 4: Insert segments between successive vertices
+        for i in 0..vertex_list.len() - 1 {
+            let v = vertex_list[i].clone();
+            let vs = vertex_list[i + 1].clone();
+            self.insert_segment(v, vs, constraint_id);
+        }
     }
 
     pub fn ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> f64 {
@@ -110,9 +116,18 @@ impl CDT {
         let edge1 = Rc::new(RefCell::new(edge1));
         let edge2 = Rc::new(RefCell::new(edge2));
 
+        println!("Edge 1: {:?}", (a.index, b.index));
+
         let sym_edge = self.sym_edges_by_edges.get(&(a.index, b.index)).unwrap();
         let face_1 = sym_edge.borrow().face.clone();
-        let face_2 = sym_edge.borrow().neighbor_face().unwrap();
+        let face_2 = sym_edge.borrow().neighbor_face();
+
+        let face_2 = match face_2 {
+            Some(face) => face,
+            None => {
+                return v;
+            }
+        };
 
         // Remove the old faces
         self.remove_face(face_1.clone());
@@ -221,5 +236,137 @@ impl CDT {
         v
     }
 
-    // fn insert_segment(v: Rc<RefCell<Vertex>>, vs: Rc<RefCell<Vertex>>, constraint_id: usize) {}
+    fn insert_segment(
+        &mut self,
+        start: Rc<RefCell<Vertex>>,
+        end: Rc<RefCell<Vertex>>,
+        constraint_id: usize,
+    ) {
+        let edge_list = self.find_crossed_edges(start.clone(), end.clone());
+
+        println!(
+            "Edge list: {:?}",
+            edge_list
+                .iter()
+                .map(|x| format!(
+                    "{:?}, {:?}",
+                    x.borrow().edge_indices(),
+                    (
+                        (
+                            x.borrow().a.borrow().position.x,
+                            x.borrow().a.borrow().position.y
+                        ),
+                        (
+                            x.borrow().b.borrow().position.x,
+                            x.borrow().b.borrow().position.y
+                        )
+                    )
+                ))
+                .collect::<Vec<_>>()
+        );
+
+        for edge in edge_list.iter() {
+            let intersection_point = intersection_point(
+                &(start.borrow().position, end.borrow().position),
+                &(
+                    edge.borrow().a.borrow().position,
+                    edge.borrow().b.borrow().position,
+                ),
+            );
+
+            if let Some(intersection_point) = intersection_point {
+                self.insert_point_on_edge(intersection_point, edge.clone());
+            }
+        }
+    }
+
+    fn find_crossed_edges(
+        &self,
+        start: Rc<RefCell<Vertex>>,
+        end: Rc<RefCell<Vertex>>,
+    ) -> Vec<Rc<RefCell<Edge>>> {
+        let mut edge_list = Vec::new();
+
+        for edge in self.edges.iter() {
+            let edge_borrowed = edge.borrow();
+
+            let is_crossing = is_crossing(
+                &(start.borrow().position, end.borrow().position),
+                &(
+                    edge_borrowed.a.borrow().position,
+                    edge_borrowed.b.borrow().position,
+                ),
+            );
+
+            if is_crossing {
+                edge_list.push(edge.clone());
+            }
+        }
+
+        // // Get the initial half-edge from the starting vertex
+        // let sym_edge = self
+        //     .sym_edges_by_vertices
+        //     .get(&start.borrow().index)
+        //     .and_then(|edges| edges.first().cloned());
+
+        // if sym_edge.is_none() {
+        //     return edge_list; // If no half-edges are associated with the vertex, return empty
+        // }
+
+        // let mut sym_edge = sym_edge.unwrap();
+        // let initial_sym_edge = sym_edge.clone(); // Keep track of the initial half-edge to detect cycles
+        // let mut visited = std::collections::HashSet::new(); // Prevent re-checking edges
+
+        // loop {
+        //     let current_edge = sym_edge.clone();
+
+        //     println!(
+        //         "Current edge: {:?}",
+        //         (
+        //             current_edge.borrow().edge.borrow().a.borrow().position,
+        //             current_edge.borrow().edge.borrow().b.borrow().position
+        //         )
+        //     );
+
+        //     // If the edge is already visited, break
+        //     let current_index = current_edge.as_ptr() as usize;
+        //     if !visited.insert(current_index) {
+        //         break;
+        //     }
+
+        //     // Check if the current edge crosses the segment
+        //     let is_crossing = is_crossing(
+        //         &(start.borrow().position, end.borrow().position),
+        //         &(
+        //             current_edge.borrow().edge.borrow().a.borrow().position,
+        //             current_edge.borrow().edge.borrow().b.borrow().position,
+        //         ),
+        //     );
+
+        //     if is_crossing {
+        //         edge_list.push(current_edge.borrow().edge.clone());
+        //     }
+
+        //     // Traverse the `nxt` edge first
+        //     let mut next_edge = current_edge.borrow().nxt.clone();
+
+        //     // If `nxt` is None or already visited, traverse the `rot` edge
+        //     if next_edge.is_none()
+        //         || visited.contains(&(next_edge.as_ref().unwrap().as_ptr() as usize))
+        //     {
+        //         next_edge = current_edge.borrow().rot.clone();
+        //     }
+
+        //     // If no new edge to traverse, or we've cycled back to the starting edge, stop
+        //     if next_edge.is_none()
+        //         || next_edge.as_ref().map(|e| e.as_ptr()) == Some(initial_sym_edge.as_ptr())
+        //     {
+        //         break;
+        //     }
+
+        //     sym_edge = next_edge.unwrap();
+        // }
+
+        edge_list
+    }
 }
