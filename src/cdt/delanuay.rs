@@ -2,7 +2,7 @@ use std::{cell::RefCell, collections::VecDeque, rc::Rc};
 
 use glam::{DMat3, DVec2, DVec3};
 
-use crate::edge::Edge;
+use crate::{edge::Edge, sym_edge, symmetric_compare::TupleOrdered};
 
 use super::cdt::CDT;
 
@@ -24,15 +24,15 @@ impl CDT {
             {
                 let e_borrowed = e.borrow();
                 if !e_borrowed.crep.is_empty() {
+   
                     continue;
                 }
 
-                //If doesnt have neighbor face, skip
-                let sym_edge = self
-                    .sym_edges_by_edges
-                    .get(&(e_borrowed.edge_indices()))
-                    .unwrap()
-                    .borrow();
+                let sym_edge_rc = self
+                    .get_sym_edge_for_half_edge(&e_borrowed.edge_indices())
+                    .unwrap();
+
+                let sym_edge = sym_edge_rc.borrow();
 
                 let face = sym_edge.face.borrow();
 
@@ -58,8 +58,12 @@ impl CDT {
                 let different_edges = face
                     .edges
                     .iter()
-                    .filter(|x| x.borrow().edge_indices() != e_borrowed.edge_indices())
+                    .filter(|x| **x != e_borrowed.edge_indices())
+                    .map(|x| self.get_sym_edge_for_half_edge(x).unwrap())
+                    .map(|x| x.borrow().edge.clone())
                     .collect::<Vec<_>>();
+
+                assert_eq!(different_edges.len(), 2);
 
                 edge_stack.push_back(different_edges[0].clone());
                 edge_stack.push_back(different_edges[1].clone());
@@ -70,8 +74,9 @@ impl CDT {
     }
 
     fn flip_edge(&mut self, edge: Rc<RefCell<Edge>>) {
-        let edge_indices = edge.borrow().edge_indices();
-        let sym_edge = self.sym_edges_by_edges.get(&edge_indices).unwrap();
+        let sym_edge = self
+            .get_sym_edge_for_half_edge(&edge.borrow().edge_indices())
+            .unwrap();
 
         let f1 = sym_edge.borrow().face.clone();
         let f2 = match sym_edge.borrow().neighbor_face() {
@@ -83,35 +88,14 @@ impl CDT {
         let v1 = f1.borrow().opposite_vertex(&edge.borrow());
         let v2 = f2.borrow().opposite_vertex(&edge.borrow());
 
-        let new_edge = Edge {
-            a: v1.clone(),
-            b: v2.clone(),
-            crep: edge.borrow().crep.clone(),
-        };
-        let new_edge = Rc::new(RefCell::new(new_edge));
-        let new_edge_borrowed = new_edge.borrow();
-
-        println!(
-            "Flipping edge: {:?} to {:?}",
-            edge.borrow().edge_indices(),
-            new_edge_borrowed.edge_indices()
-        );
 
         // Deleting the old faces
         self.remove_face(f1.clone());
         self.remove_face(f2.clone());
 
         // Create two completely new faces
-        self.add_face([
-            new_edge_borrowed.b.clone(),
-            new_edge_borrowed.a.clone(),
-            edge.borrow().a.clone(),
-        ]);
+        self.add_face([v2.clone(), v1.clone(), edge.borrow().a.clone()]);
 
-        self.add_face([
-            new_edge_borrowed.a.clone(),
-            new_edge_borrowed.b.clone(),
-            edge.borrow().b.clone(),
-        ]);
+        self.add_face([v1.clone(), v2.clone(), edge.borrow().b.clone()]);
     }
 }

@@ -1,21 +1,17 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{edge::Edge, vertex::Vertex};
+use crate::{edge::Edge, sym_edge::SymEdge, vertex::Vertex};
 
 #[derive(Clone, Debug)]
 pub struct Face {
-    pub id: usize,                          // Index of the face
-    pub vertices: [Rc<RefCell<Vertex>>; 3], // Indices of the vertices
-    pub edges: [Rc<RefCell<Edge>>; 3],      // Indices of the edges
+    pub id: usize,
+    pub vertices: [Rc<RefCell<Vertex>>; 3],
+    pub edges: [(usize, usize); 3],
 }
 
 impl Face {
     pub fn edge_indices(&self) -> [(usize, usize); 3] {
-        [
-            self.edges[0].borrow().edge_indices(),
-            self.edges[1].borrow().edge_indices(),
-            self.edges[2].borrow().edge_indices(),
-        ]
+        self.edges
     }
 
     pub fn vertex_indices(&self) -> [usize; 3] {

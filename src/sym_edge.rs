@@ -26,6 +26,19 @@ impl std::fmt::Debug for SymEdge {
 }
 
 impl SymEdge {
+    pub fn a(&self) -> Rc<RefCell<Vertex>> {
+        self.vertex.clone()
+    }
+
+    pub fn b(&self) -> Rc<RefCell<Vertex>> {
+        let edge = self.edge.borrow();
+        if edge.a.borrow().index == self.vertex.borrow().index {
+            edge.b.clone()
+        } else {
+            edge.a.clone()
+        }
+    }
+
     pub fn bare_to_string(&self) -> String {
         format!(
             "SymEdge {{ vertex: {:?}, edge: {:?}, face: {:?}}}",
@@ -33,6 +46,10 @@ impl SymEdge {
             self.edge.borrow(),
             self.face,
         )
+    }
+
+    pub fn edge_indices(&self) -> (usize, usize) {
+        (self.a().borrow().index, self.b().borrow().index)
     }
 
     pub fn neighbor(&self) -> Option<Rc<RefCell<SymEdge>>> {

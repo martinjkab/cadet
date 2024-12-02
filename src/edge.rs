@@ -15,14 +15,6 @@ impl Edge {
     pub fn edge_indices(&self) -> (usize, usize) {
         (self.a.borrow().index, self.b.borrow().index)
     }
-
-    pub fn flipped(&self) -> Edge {
-        Edge {
-            a: self.b.clone(),
-            b: self.a.clone(),
-            crep: self.crep.clone(),
-        }
-    }
 }
 
 impl std::fmt::Display for Edge {

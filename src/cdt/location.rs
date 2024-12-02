@@ -3,7 +3,7 @@ use std::{cell::RefCell, collections::HashMap, rc::Rc};
 use glam::DVec2;
 use rand::seq::IteratorRandom;
 
-use crate::{face::Face, locate_result::LocateResult, orientation::Orientation};
+use crate::{edge, face::Face, locate_result::LocateResult, orientation::Orientation};
 
 use super::cdt::CDT;
 
@@ -17,6 +17,7 @@ impl CDT {
         let random_sample = self.faces.iter().choose_multiple(&mut rng, sample_size);
 
         let mut closest_face = random_sample[0].clone();
+
         let mut min_distance = f64::MAX;
 
         for triangle in random_sample {
@@ -35,6 +36,7 @@ impl CDT {
         let mut visited = HashMap::<usize, bool>::new();
 
         loop {
+            assert!(self.faces.iter().any(|f| Rc::ptr_eq(&f, &closest_face)));
             let vertices = closest_face.borrow().vertices.clone();
             let vertices = [
                 vertices[0].borrow(),
@@ -49,12 +51,15 @@ impl CDT {
 
             let mut selected_edge_index = None;
 
+
             // Find the edge that separates p and the centroid
             for (i, edge) in closest_face.borrow().edges.iter().enumerate() {
-                let edge_ref = edge.clone();
-                let edge_borrowed = edge_ref.borrow();
-                let vertex = edge_borrowed.a.borrow();
-                let next_vertex = edge_borrowed.b.borrow();
+                let sym_edge = self.get_sym_edge_for_half_edge(edge).unwrap();
+                let edge_borrowed = sym_edge.borrow();
+                let a = edge_borrowed.a();
+                let b = edge_borrowed.b();
+                let vertex = a.borrow();
+                let next_vertex = b.borrow();
 
                 let is_point_ccw = Self::is_ccw(&vertex.position, &next_vertex.position, p);
                 let is_centroid_ccw =
@@ -62,7 +67,7 @@ impl CDT {
                 let is_separating_edge = is_point_ccw != is_centroid_ccw;
 
                 if is_point_ccw == Orientation::Collinear {
-                    return LocateResult::Edge(edge.clone());
+                    return LocateResult::Edge(edge_borrowed.edge.clone());
                 }
 
                 if is_separating_edge {
@@ -79,9 +84,12 @@ impl CDT {
                     if visited.get(&neighbor.borrow().id).copied().unwrap_or(false) {
                         // A loop is detected; fallback to epsilon-based checks
                         if Self::is_point_on_edge(p, &closest_face.borrow()) {
-                            return LocateResult::Edge(
-                                closest_face.borrow().edges[edge_index].clone(),
+                            let sym_edge = self.get_sym_edge_for_half_edge(
+                                &closest_face.borrow().edges[edge_index],
                             );
+                            let sym_edge = sym_edge.unwrap();
+                            let edge = sym_edge.borrow().edge.clone();
+                            return LocateResult::Edge(edge);
                         }
                         return LocateResult::Face(closest_face.clone());
                     }
@@ -91,10 +99,11 @@ impl CDT {
                 } else {
                     // Check if point lies outside the convex hull
                     let edge = &closest_face.borrow().edges[edge_index];
+                    let edge = self.get_sym_edge_for_half_edge(edge).unwrap();
                     let edge_borrowed = edge.borrow();
                     let is_ccw = Self::is_ccw(
-                        &edge_borrowed.a.borrow().position,
-                        &edge_borrowed.b.borrow().position,
+                        &edge_borrowed.a().borrow().position,
+                        &edge_borrowed.b().borrow().position,
                         p,
                     ) == Orientation::CounterClockwise;
                     if is_ccw {
@@ -128,10 +137,9 @@ impl CDT {
         edge_index: usize,
     ) -> Option<Rc<RefCell<Face>>> {
         // Get the SymEdge corresponding to the edge
-        let edge = &face.edges[edge_index].borrow();
-        let a_index = edge.a.borrow().index;
-        let b_index = edge.b.borrow().index;
-        let sym_edge = self.sym_edges_by_edges.get(&(a_index, b_index))?.borrow();
+        let edge = &face.edges[edge_index];
+        let binding = self.get_sym_edge_for_half_edge(&edge)?;
+        let sym_edge = binding.borrow();
 
         sym_edge.neighbor_face()
     }

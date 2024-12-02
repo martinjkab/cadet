@@ -9,6 +9,30 @@ impl SymmetricCompare for (usize, usize) {
     }
 
     fn inverse_compare(&self, other: &(usize, usize)) -> bool {
-        self == &(other.1, other.0)
+        self == &other.flipped()
+    }
+}
+
+pub trait Flipped {
+    fn flipped(&self) -> (usize, usize);
+}
+
+impl Flipped for (usize, usize) {
+    fn flipped(&self) -> (usize, usize) {
+        (self.1, self.0)
+    }
+}
+
+pub trait TupleOrdered {
+    fn ordered(&self) -> (usize, usize);
+}
+
+impl TupleOrdered for (usize, usize) {
+    fn ordered(&self) -> (usize, usize) {
+        if self.0 < self.1 {
+            *self
+        } else {
+            (self.1, self.0)
+        }
     }
 }
