@@ -1,4 +1,5 @@
 use glam::DVec2;
+use intersection_detection::{Intersection, IntersectionResult, Line, PointLike};
 
 fn cross(v1: DVec2, v2: DVec2) -> f64 {
     v1.x * v2.y - v1.y * v2.x
@@ -12,24 +13,13 @@ pub fn intersection_point(e1: &(DVec2, DVec2), e2: &(DVec2, DVec2)) -> Option<DV
     let (a, b) = e1;
     let (c, d) = e2;
 
-    let ab = b - a;
-    let ac = c - a;
-    let ad = d - a;
-    let cd = d - c;
-    let ca = a - c;
+    let line1 = Line::new([a.x, a.y], [b.x, b.y]);
+    let line2 = Line::new([c.x, c.y], [d.x, d.y]);
 
-    let d1 = cross(ab, ac);
-    let d2 = cross(ab, ad);
-    let d3 = cross(cd, ca);
+    let computation = line1.intersection(&line2).try_into_intersection().ok();
 
-    if d1 * d2 < 0.0 && d1 * d2 < 0.0 {
-        let t = d1 / (d1 - d2);
-        let u = d3 / (d3 - cross(cd, ad));
-
-        if t >= 0.0 && t <= 1.0 && u >= 0.0 && u <= 1.0 {
-            return Some(a + ab * t);
-        }
+    match computation {
+        Some(Intersection::Point(p)) => Some(DVec2::new(p[0], p[1])),
+        _ => None,
     }
-
-    None
 }

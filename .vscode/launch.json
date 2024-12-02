@@ -20,7 +20,7 @@
           "kind": "bin"
         }
       },
-      "args": ["./models/model.glb", "./models/output.obj"], // Add your run arguments here
+      "args": ["./models/model_8.glb", "./models/output.obj"], // Add your run arguments here
       "cwd": "${workspaceFolder}"
     }
   ]

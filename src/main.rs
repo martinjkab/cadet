@@ -26,6 +26,16 @@ fn get_path_from_stdin(prompt: &str) -> String {
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
 
+    let a = DVec2 { x: -0.75, y: -0.75 };
+    let b = DVec2 { x: 0.75, y: -0.75 };
+
+    let c = DVec2 { x: -1., y: -1. };
+    let d = DVec2 { x: -1., y: -0.5 };
+
+    println!("Is crossing: {}", is_crossing(&(a, b), &(c, d)));
+
+    assert_eq!(is_crossing(&(a, b), &(c, d)), false);
+
     let args: Vec<String> = std::env::args().collect();
 
     let input_path = if args.len() > 1 {
@@ -44,7 +54,15 @@ fn main() {
     cdt.build_sym_edges().unwrap();
 
     cdt.insert_constraint(
-        [DVec2 { x: -0.75, y: -0.75 }, DVec2 { x: 0.75, y: -0.75 }].to_vec(),
+        [
+            // DVec2 { x: -0.5, y: -0.25 },
+            // DVec2 { x: 0.5, y: -0.25 },
+            // DVec2 { x: 0.5, y: 0.25 },
+            // DVec2 { x: -0.5, y: 0.25 },
+            DVec2 { x: -0.75, y: -0.75 },
+            DVec2 { x: 0.75, y: -0.75 },
+        ]
+        .to_vec(),
         0,
     );
 

@@ -13,7 +13,7 @@ use crate::{
     locate_result::LocateResult,
     orientation::Orientation,
     sym_edge::SymEdge,
-    symmetric_compare::SymmetricCompare,
+    symmetric_compare::{Flipped, SymmetricCompare},
     vertex::Vertex,
 };
 
@@ -54,6 +54,14 @@ impl CDT {
             vertex_list.push(vertex);
         }
 
+        println!(
+            "Vertex list: {:?}",
+            vertex_list
+                .iter()
+                .map(|v| v.borrow().position)
+                .collect::<Vec<_>>()
+        );
+
         // // Step 4: Insert segments between successive vertices
         for i in 0..vertex_list.len() - 1 {
             let v = vertex_list[i].clone();
@@ -86,7 +94,6 @@ impl CDT {
         point: DVec2,
         edge: Rc<RefCell<Edge>>,
     ) -> Rc<RefCell<Vertex>> {
-        let edge_rc = edge.clone();
         let edge = edge.borrow();
         let a = edge.a.borrow();
         let b = edge.b.borrow();
@@ -99,6 +106,12 @@ impl CDT {
 
         let v = self.add_vertex(a.position + ab * t, 1);
 
+        println!(
+            "Inserting point from: {:?} to {:?} at {:?}",
+            point,
+            v.borrow().position,
+            (edge.a.borrow().position, edge.b.borrow().position)
+        );
         let edge_indices = edge.edge_indices();
 
         let sym_edge = self.get_sym_edge_for_half_edge(&edge_indices).unwrap();
@@ -112,7 +125,6 @@ impl CDT {
             }
         };
 
-        assert!(face_1.borrow().vertex_indices() != face_2.borrow().vertex_indices());
         assert!(face_1.as_ptr() != face_2.as_ptr());
 
         // Remove the old faces
@@ -242,18 +254,67 @@ impl CDT {
     ) {
         let edge_list = self.find_crossed_edges(start.clone(), end.clone());
 
+        println!(
+            "Edge list: {:?}",
+            edge_list
+                .iter()
+                .map(|edge| edge.borrow().edge_indices())
+                .collect::<Vec<_>>()
+        );
+
+        let mut removed_faces = Vec::new();
+
         for edge in edge_list.iter() {
-            let intersection_point = intersection_point(
-                &(start.borrow().position, end.borrow().position),
-                &(
-                    edge.borrow().a.borrow().position,
-                    edge.borrow().b.borrow().position,
-                ),
+            let a = start.borrow().position;
+            let b = end.borrow().position;
+            let c = edge.borrow().a.borrow().position;
+            let d = edge.borrow().b.borrow().position;
+
+            let intersection_point = intersection_point(&(a, b), &(c, d));
+
+            // if let Some(intersection_point) = intersection_point {
+            //     self.insert_point_on_edge(intersection_point, edge.clone());
+            // }
+
+            println!(
+                "All sym edges: {:?}",
+                self.sym_edges_by_half_edges
+                    .iter()
+                    .map(|(key, value)| key)
+                    .collect::<Vec<_>>()
             );
 
-            if let Some(intersection_point) = intersection_point {
-                self.insert_point_on_edge(intersection_point, edge.clone());
-            }
+            let edge_indices = edge.borrow().edge_indices();
+
+            println!("Edge: {:?} ", edge_indices);
+
+            // Delete all triangles that contain the edge
+            let sym_edge = self
+                .get_sym_edge_for_half_edge(&edge_indices)
+                .or_else(|| self.get_sym_edge_for_half_edge(&edge_indices.flipped()));
+
+            let sym_edge = match sym_edge {
+                Some(sym_edge) => sym_edge,
+                None => {
+                    continue;
+                }
+            };
+
+            let face_1 = sym_edge.borrow().face.clone();
+            let face_2 = sym_edge.borrow().neighbor_face();
+
+            let face_2 = match face_2 {
+                Some(face) => face,
+                None => {
+                    continue;
+                }
+            };
+
+            self.remove_face(face_1.clone());
+            self.remove_face(face_2.clone());
+
+            removed_faces.push(face_1);
+            removed_faces.push(face_2);
         }
     }
 
