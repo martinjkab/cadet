@@ -54,17 +54,42 @@ fn main() {
     cdt.build_sym_edges().unwrap();
 
     cdt.insert_constraint(
-        [
-            // DVec2 { x: -0.5, y: -0.25 },
-            // DVec2 { x: 0.5, y: -0.25 },
-            // DVec2 { x: 0.5, y: 0.25 },
-            // DVec2 { x: -0.5, y: 0.25 },
-            DVec2 { x: -0.75, y: -0.75 },
-            DVec2 { x: 0.75, y: -0.75 },
-        ]
-        .to_vec(),
+        // [
+        //     // DVec2 { x: -0.75, y: -0.75 },
+        //     // DVec2 { x: 0.75, y: -0.75 },
+        //     // DVec2 { x: 0.75, y: 0.75 },
+        //     // DVec2 { x: -0.75, y: 0.75 },
+        //     // DVec2 { x: -0.75, y: -0.75 },
+        //     // DVec2 { x: 0., y: 0. },
+        //     // DVec2 { x: -0.25, y: -0.25 },
+        //     // DVec2 { x: 0.25, y: -0.25 },
+        //     // DVec2 { x: 0.25, y: 0.25 },
+        //     // DVec2 { x: -0.25, y: 0.25 },
+        //     // DVec2 { x: -0.25, y: -0.25 },
+        //     // DVec2 { x: 0., y: 0. },
+
+        // ]
+        // .to_vec(),
+        generate_circle(DVec2 { x: 0., y: 0. }, 0.75, 16).to_vec(),
+        0,
+    );
+
+    cdt.insert_constraint(
+        generate_circle(DVec2 { x: 0., y: 0. }, 0.25, 16).to_vec(),
         0,
     );
 
     cdt.export_to_obj(&output_path);
+}
+
+//Generate a circle from DVec2 with radius r
+fn generate_circle(center: DVec2, r: f64, n: usize) -> Vec<DVec2> {
+    let mut circle = Vec::new();
+    let step = 2. * std::f64::consts::PI / n as f64;
+    for i in 0..n + 1 {
+        let x = center.x + r * f64::cos(i as f64 * step);
+        let y = center.y + r * f64::sin(i as f64 * step);
+        circle.push(DVec2 { x, y });
+    }
+    circle
 }

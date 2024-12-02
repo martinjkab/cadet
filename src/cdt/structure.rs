@@ -14,7 +14,6 @@ use super::cdt::CDT;
 
 impl CDT {
     pub fn add_face(&mut self, vertices: [Rc<RefCell<Vertex>>; 3]) -> Rc<RefCell<Face>> {
-
         let edges = (0..vertices.len())
             .map(|i| {
                 let a = vertices[i].borrow().index;
@@ -28,7 +27,6 @@ impl CDT {
             vertices,
             edges: [edges[0].clone(), edges[1].clone(), edges[2].clone()],
         }));
-
 
         edges.iter().for_each(|edge| {
             let index = self
@@ -62,7 +60,6 @@ impl CDT {
 
         self.face_id_counter += 1;
 
-
         face.clone()
     }
 
@@ -75,7 +72,6 @@ impl CDT {
         self.faces.retain(|x| x.as_ptr() != face.as_ptr());
 
         assert_eq!(self.faces.len(), len_before - 1);
-
 
         // Remove face from sym_edges_by_edges
         for edge in face_borrowed.edges.iter() {
@@ -114,6 +110,7 @@ impl CDT {
                 nxt: None,
                 rot: None,
             }));
+            println!("Adding sym edge: {:?}", sym.borrow().edge_indices());
             face_symedges.push(sym.clone());
 
             self.sym_edges_by_vertices
@@ -201,6 +198,7 @@ impl CDT {
 
         let is_any_rot_of_this = which_is_rot_of_this.clone().len() > 0;
 
+        println!("Removing sym edge: {:?}", sym_edge.borrow().edge_indices());
 
         assert!(!is_any_rot_of_this);
     }
@@ -241,7 +239,6 @@ impl CDT {
             let next = angle_to_sym_edges[(i + 1) % angle_to_sym_edges.len()]
                 .1
                 .clone();
-
 
             current.borrow_mut().rot = Some(next.clone());
         }

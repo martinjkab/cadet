@@ -22,15 +22,18 @@ impl CDT {
     pub fn flip_edges(&mut self, edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>) {
         while let Some(e) = edge_stack.pop_front() {
             {
+                println!("Flipping edge: {:?}", e.borrow().edge_indices());
                 let e_borrowed = e.borrow();
                 if !e_borrowed.crep.is_empty() {
-   
                     continue;
                 }
 
-                let sym_edge_rc = self
-                    .get_sym_edge_for_half_edge(&e_borrowed.edge_indices())
-                    .unwrap();
+                let sym_edge_rc = self.get_sym_edge_for_half_edge(&e_borrowed.edge_indices());
+
+                let sym_edge_rc = match sym_edge_rc {
+                    Some(sym_edge) => sym_edge,
+                    None => continue,
+                };
 
                 let sym_edge = sym_edge_rc.borrow();
 
@@ -87,7 +90,6 @@ impl CDT {
         // Az e élt nem tartalmazó csúcsok mindkét háromszögben
         let v1 = f1.borrow().opposite_vertex(&edge.borrow());
         let v2 = f2.borrow().opposite_vertex(&edge.borrow());
-
 
         // Deleting the old faces
         self.remove_face(f1.clone());
