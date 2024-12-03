@@ -1,8 +1,15 @@
-use std::{cell::RefCell, collections::VecDeque, rc::Rc};
+use std::{cell::RefCell, collections::VecDeque, io::BufRead, rc::Rc};
 
 use glam::{DMat3, DVec2, DVec3};
 
-use crate::{edge::Edge, sym_edge, symmetric_compare::TupleOrdered};
+use crate::{
+    cdt::location::FastLocate,
+    edge::Edge,
+    helper::is_point_in_triangle,
+    sym_edge,
+    symmetric_compare::{Flipped, SymmetricCompare, TupleOrdered},
+    vertex::Vertex,
+};
 
 use super::cdt::CDT;
 
@@ -15,24 +22,37 @@ impl CDT {
             DVec3::new(c.x - d.x, c.y - d.y, (c - d).dot(c - d)),
         );
         let det = matrix.determinant();
-        det >= 0.0 // True if the point is not inside the circumcircle
+        println!("Determinant: {}", det);
+        det >= 0.0
     }
 
     // Edge-flipping routine
-    pub fn flip_edges(&mut self, edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>) {
+    pub fn flip_edges(
+        &mut self,
+        p: Rc<RefCell<Vertex>>,
+        edge_stack: &mut VecDeque<Rc<RefCell<Edge>>>,
+    ) {
         while let Some(e) = edge_stack.pop_front() {
             {
-                println!("Flipping edge: {:?}", e.borrow().edge_indices());
+                println!("Checking edge {:?}", e.borrow().edge_indices());
                 let e_borrowed = e.borrow();
                 if !e_borrowed.crep.is_empty() {
+                    println!("Edge {:?} is constrained", e_borrowed.edge_indices());
                     continue;
                 }
 
                 let sym_edge_rc = self.get_sym_edge_for_half_edge(&e_borrowed.edge_indices());
 
                 let sym_edge_rc = match sym_edge_rc {
+                    Some(sym_edge) => Some(sym_edge),
+                    None => self.get_sym_edge_for_half_edge(&e_borrowed.edge_indices().flipped()),
+                };
+
+                let sym_edge_rc = match sym_edge_rc {
                     Some(sym_edge) => sym_edge,
-                    None => continue,
+                    None => {
+                        continue;
+                    }
                 };
 
                 let sym_edge = sym_edge_rc.borrow();
@@ -41,7 +61,13 @@ impl CDT {
 
                 let neighbor_face = match sym_edge.neighbor_face() {
                     Some(face) => face,
-                    None => continue,
+                    None => {
+                        println!(
+                            "No neighbor face found for edge {:?}",
+                            e_borrowed.edge_indices()
+                        );
+                        continue;
+                    }
                 };
                 let neighbor_face = neighbor_face.borrow();
 
@@ -55,21 +81,33 @@ impl CDT {
                 );
 
                 if is_delanuay {
+                    println!("Edge {:?} is Delaunay", e_borrowed.edge_indices());
                     continue; // Skip if the edge is already Delaunay
                 }
+
+                println!("Neighboring face: {:?}", neighbor_face.vertex_indices());
 
                 let different_edges = face
                     .edges
                     .iter()
-                    .filter(|x| **x != e_borrowed.edge_indices())
+                    .filter(|x| !(**x).symmetric_compare(&e_borrowed.edge_indices()))
                     .map(|x| self.get_sym_edge_for_half_edge(x).unwrap())
                     .map(|x| x.borrow().edge.clone())
                     .collect::<Vec<_>>();
 
                 assert_eq!(different_edges.len(), 2);
 
-                edge_stack.push_back(different_edges[0].clone());
-                edge_stack.push_back(different_edges[1].clone());
+                println!(
+                    "Pushing to stack: {:?}",
+                    different_edges[0].borrow().edge_indices()
+                );
+                println!(
+                    "Pushing to stack: {:?}",
+                    different_edges[1].borrow().edge_indices()
+                );
+
+                edge_stack.push_front(different_edges[0].clone());
+                edge_stack.push_front(different_edges[1].clone());
             }
 
             self.flip_edge(e.clone());
@@ -82,10 +120,7 @@ impl CDT {
             .unwrap();
 
         let f1 = sym_edge.borrow().face.clone();
-        let f2 = match sym_edge.borrow().neighbor_face() {
-            Some(face) => face,
-            None => return,
-        };
+        let f2 = sym_edge.borrow().neighbor_face().unwrap();
 
         // Az e élt nem tartalmazó csúcsok mindkét háromszögben
         let v1 = f1.borrow().opposite_vertex(&edge.borrow());
@@ -95,9 +130,21 @@ impl CDT {
         self.remove_face(f1.clone());
         self.remove_face(f2.clone());
 
-        // Create two completely new faces
-        self.add_face([v2.clone(), v1.clone(), edge.borrow().a.clone()]);
+        println!(
+            "Flipping edge: {:?} to {:?}",
+            sym_edge.borrow().edge.borrow().edge_indices(),
+            (v1.borrow().index, v2.borrow().index)
+        );
 
-        self.add_face([v1.clone(), v2.clone(), edge.borrow().b.clone()]);
+        // Create two completely new faces
+        let f1 = self.add_face([v2.clone(), v1.clone(), edge.borrow().a.clone()]);
+
+        let f2 = self.add_face([v1.clone(), v2.clone(), edge.borrow().b.clone()]);
+
+        self.export_to_obj("./models/output.obj");
+
+        //Waiting for user input
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
     }
 }

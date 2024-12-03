@@ -26,16 +26,6 @@ fn get_path_from_stdin(prompt: &str) -> String {
 fn main() {
     std::env::set_var("RUST_BACKTRACE", "1");
 
-    let a = DVec2 { x: -0.75, y: -0.75 };
-    let b = DVec2 { x: 0.75, y: -0.75 };
-
-    let c = DVec2 { x: -1., y: -1. };
-    let d = DVec2 { x: -1., y: -0.5 };
-
-    println!("Is crossing: {}", is_crossing(&(a, b), &(c, d)));
-
-    assert_eq!(is_crossing(&(a, b), &(c, d)), false);
-
     let args: Vec<String> = std::env::args().collect();
 
     let input_path = if args.len() > 1 {
@@ -54,30 +44,55 @@ fn main() {
     cdt.build_sym_edges().unwrap();
 
     cdt.insert_constraint(
-        // [
-        //     // DVec2 { x: -0.75, y: -0.75 },
-        //     // DVec2 { x: 0.75, y: -0.75 },
-        //     // DVec2 { x: 0.75, y: 0.75 },
-        //     // DVec2 { x: -0.75, y: 0.75 },
-        //     // DVec2 { x: -0.75, y: -0.75 },
-        //     // DVec2 { x: 0., y: 0. },
-        //     // DVec2 { x: -0.25, y: -0.25 },
-        //     // DVec2 { x: 0.25, y: -0.25 },
-        //     // DVec2 { x: 0.25, y: 0.25 },
-        //     // DVec2 { x: -0.25, y: 0.25 },
-        //     // DVec2 { x: -0.25, y: -0.25 },
-        //     // DVec2 { x: 0., y: 0. },
-
-        // ]
-        // .to_vec(),
-        generate_circle(DVec2 { x: 0., y: 0. }, 0.75, 16).to_vec(),
+        [
+            DVec2 { x: -0.25, y: -0.25 },
+            DVec2 { x: 0.25, y: -0.25 },
+            DVec2 { x: 0.25, y: 0.25 },
+            // DVec2 { x: -0.25, y: 0.25 },
+            // DVec2 { x: -0.25, y: -0.25 },
+            // DVec2 { x: 0., y: 0. },
+            // DVec2 { x: -0.25, y: -0.25 },
+            // DVec2 { x: 0.25, y: -0.25 },
+            // DVec2 { x: 0.25, y: 0.25 },
+            // DVec2 { x: -0.25, y: 0.25 },
+            // DVec2 { x: -0.25, y: -0.25 },
+            // DVec2 { x: 0., y: 0. },
+        ]
+        .to_vec(),
         0,
     );
 
-    cdt.insert_constraint(
-        generate_circle(DVec2 { x: 0., y: 0. }, 0.25, 16).to_vec(),
-        0,
-    );
+    // cdt.insert_constraint([DVec2 { x: 0., y: 0. }].to_vec(), 0);
+
+    // cdt.insert_constraint(
+    //     generate_circle(DVec2 { x: 0., y: 0. }, 0.75, 32).to_vec(),
+    //     0,
+    // );
+    // cdt.insert_constraint(generate_circle(DVec2 { x: 0., y: 0. }, 0.25, 8).to_vec(), 0);
+
+    // cdt.insert_constraint(
+    //     generate_line(100, DVec2 { x: -1.0, y: 1.0 }, DVec2 { x: 1.0, y: -1.0 }),
+    //     0,d
+    // );
+
+    // cdt.insert_constraint(
+    //     [DVec2 { x: -0.75, y: -0.5 }, DVec2 { x: 0.75, y: -0.5 }].to_vec(),
+    //     0,
+    // );
+
+    println!("Number of faces: {}", cdt.faces.len());
+
+    //Verify that for every sym_edge, the face exists
+    for sym_edge in cdt.sym_edges_by_half_edges.values() {
+        let sym_edge = sym_edge.borrow();
+
+        let is_any_face = cdt
+            .faces
+            .iter()
+            .any(|face| face.as_ptr() == sym_edge.face.as_ptr());
+
+        assert!(is_any_face);
+    }
 
     cdt.export_to_obj(&output_path);
 }
@@ -86,10 +101,21 @@ fn main() {
 fn generate_circle(center: DVec2, r: f64, n: usize) -> Vec<DVec2> {
     let mut circle = Vec::new();
     let step = 2. * std::f64::consts::PI / n as f64;
-    for i in 0..n + 1 {
+    for i in 0..n {
         let x = center.x + r * f64::cos(i as f64 * step);
         let y = center.y + r * f64::sin(i as f64 * step);
         circle.push(DVec2 { x, y });
     }
     circle
+}
+
+fn generate_line(n: usize, from: DVec2, to: DVec2) -> Vec<DVec2> {
+    let mut line = Vec::new();
+    let step = (to - from) / n as f64;
+    for i in 0..n {
+        let x = from.x + i as f64 * step.x;
+        let y = from.y + i as f64 * step.y;
+        line.push(DVec2 { x, y });
+    }
+    line
 }

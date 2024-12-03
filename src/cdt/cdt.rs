@@ -40,6 +40,22 @@ impl CDT {
             // Step 1: Locate the point in the triangulation
             let locate_result = self.locate_point(point);
 
+            match locate_result {
+                LocateResult::Vertex(_) => {
+                    println!("Vertex");
+                }
+                LocateResult::Edge(_) => {
+                    println!("Edge");
+                }
+                LocateResult::Face(_) => {
+                    println!("Face");
+                }
+                LocateResult::None => {
+                    println!("None");
+                    continue;
+                }
+            }
+
             // Step 2: Handle the locate result
             let vertex = match locate_result {
                 LocateResult::Vertex(v) => v,
@@ -55,11 +71,11 @@ impl CDT {
         }
 
         // // Step 4: Insert segments between successive vertices
-        for i in 0..vertex_list.len() - 1 {
-            let v = vertex_list[i].clone();
-            let vs = vertex_list[i + 1].clone();
-            self.insert_segment(v, vs, constraint_id);
-        }
+        // for i in 0..vertex_list.len() - 1 {
+        //     let v = vertex_list[i].clone();
+        //     let vs = vertex_list[i + 1].clone();
+        //     self.insert_segment(v, vs, constraint_id);
+        // }
     }
 
     pub fn ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> f64 {
@@ -90,20 +106,16 @@ impl CDT {
         let a = edge.a.borrow();
         let b = edge.b.borrow();
 
+        // Project the point onto the line
         let ab = b.position - a.position;
         let ap = point - a.position;
 
         let t = ap.dot(ab) / ab.dot(ab);
-        let t = t.clamp(0.0, 1.0);
 
-        let v = self.add_vertex(a.position + ab * t, 1);
+        let position = a.position + ab * t;
 
-        println!(
-            "Inserting point from: {:?} to {:?} at {:?}",
-            point,
-            v.borrow().position,
-            (edge.a.borrow().position, edge.b.borrow().position)
-        );
+        let v = self.add_vertex(position, 1);
+
         let edge_indices = edge.edge_indices();
 
         let sym_edge = self.get_sym_edge_for_half_edge(&edge_indices).unwrap();
@@ -165,7 +177,7 @@ impl CDT {
             ]),
         ];
 
-        let edges = new_faces
+        let mut edges = new_faces
             .iter()
             .map(|face| face.borrow().edges.clone())
             .flatten()
@@ -182,12 +194,20 @@ impl CDT {
             .map(|edge| edge.borrow().edge.clone())
             .collect::<Vec<_>>();
 
+        edges.reverse();
+
         assert!(edges.len() == 4);
 
         let mut edge_stack = VecDeque::new();
         edge_stack.extend(edges.clone());
 
-        self.flip_edges(&mut edge_stack);
+        self.export_to_obj("./models/output.obj");
+
+        //Waiting for user input
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+
+        self.flip_edges(v.clone(), &mut edge_stack);
 
         v
     }
@@ -233,7 +253,13 @@ impl CDT {
         let mut edge_stack = VecDeque::new();
         edge_stack.extend(edges.clone());
 
-        self.flip_edges(&mut edge_stack);
+        self.export_to_obj("./models/output.obj");
+
+        //Waiting for user input
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).unwrap();
+
+        self.flip_edges(v.clone(), &mut edge_stack);
 
         v
     }
@@ -245,17 +271,6 @@ impl CDT {
         constraint_id: usize,
     ) {
         let mut edge_list = self.find_crossed_edges(start.clone(), end.clone());
-
-        println!(
-            "Edge list: {:?}",
-            edge_list
-                .iter()
-                .map(|e| (
-                    e.borrow().a.borrow().position,
-                    e.borrow().b.borrow().position
-                ))
-                .collect::<Vec<_>>()
-        );
 
         if edge_list.is_empty() {
             return;
@@ -339,18 +354,20 @@ impl CDT {
             }
         }
 
+        let mut new_faces = Vec::new();
+
         for i in 0..top_vertices.len() - 1 {
             let v = top_vertices[i].clone();
             let vs = top_vertices[i + 1].clone();
 
-            self.add_face([start.clone(), v.clone(), vs.clone()]);
+            new_faces.push(self.add_face([start.clone(), v.clone(), vs.clone()]));
         }
 
         for i in 0..bottom_vertices.len() - 1 {
             let v = bottom_vertices[i].clone();
             let vs = bottom_vertices[i + 1].clone();
 
-            self.add_face([start.clone(), vs.clone(), v.clone()]);
+            new_faces.push(self.add_face([start.clone(), vs.clone(), v.clone()]));
         }
 
         // Insert the finsishing triangles
@@ -360,6 +377,9 @@ impl CDT {
         let face_1 = self.add_face([start.clone(), end.clone(), v.clone()]);
         let face_2 = self.add_face([end.clone(), start.clone(), vs.clone()]);
 
+        new_faces.push(face_1);
+        new_faces.push(face_2);
+
         let mut line = Vec::new();
 
         line.push(start.clone());
@@ -368,53 +388,22 @@ impl CDT {
         bottom_vertices.reverse();
         line.extend(bottom_vertices);
 
-        // println!(
-        //     "Line: {:?}",
-        //     line.iter().map(|v| v.borrow().index).collect::<Vec<_>>()
-        // );
-
         let mut edges = VecDeque::new();
 
-        for i in 0..line.len() - 1 {
-            let v = line[i].borrow().index;
-            let vs = line[(i + 1) % line.len()].borrow().index;
-
-            let sym_edge = self.get_sym_edge_for_half_edge(&(v, vs));
-            let sym_edge = match sym_edge {
-                Some(sym_edge) => sym_edge,
-                None => {
-                    continue;
-                }
-            };
-
-            let edge = sym_edge.borrow().edge.clone();
-
-            edges.push_back(edge.clone());
+        for i in new_faces.iter() {
+            let face = i.borrow();
+            for edge in face.edges.iter() {
+                edges.push_back(
+                    self.get_sym_edge_for_half_edge(edge)
+                        .unwrap()
+                        .borrow()
+                        .edge
+                        .clone(),
+                );
+            }
         }
 
-        // println!("Face1: {:?}", face_1.borrow().vertex_indices());
-        // println!("Face2: {:?}", face_2.borrow().vertex_indices());
-
-        // println!("Start: {:?}", start.borrow().index);
-        // println!("End: {:?}", end.borrow().index);
-
-        // let mut edges = [face_1.clone(), face_2.clone()]
-        //     .iter()
-        //     .map(|face| face.borrow().edges.clone())
-        //     .flatten()
-        //     .map(|edge| self.get_sym_edge_for_half_edge(&edge).unwrap())
-        //     .map(|edge| edge.borrow().edge.clone())
-        //     .filter(|edge| {
-        //         !edge
-        //             .borrow()
-        //             .edge_indices()
-        //             .symmetric_compare(&(start.borrow().index, end.borrow().index))
-        //     })
-        //     .collect::<VecDeque<_>>();
-
-        // assert_eq!(edges.len(), 4);
-
-        self.flip_edges(&mut edges);
+        self.flip_edges(v.clone(), &mut edges);
     }
 
     fn find_crossed_edges(

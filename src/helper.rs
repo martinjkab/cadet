@@ -42,3 +42,42 @@ enum IntersectionType {
     Parallel,
     Point(DVec2),
 }
+
+fn cross_product(a: DVec2, b: DVec2) -> f64 {
+    a.x * b.y - a.y * b.x
+}
+
+pub fn is_point_in_triangle(a: &DVec2, b: &DVec2, c: &DVec2, p: &DVec2) -> FaceLocateResult {
+    // Compute vectors
+    let ab = b - a;
+    let bc = c - b;
+    let ca = a - c;
+
+    let ap = p - a;
+    let bp = p - b;
+    let cp = p - c;
+
+    // Cross products
+    let cross1 = cross_product(ab, ap);
+    let cross2 = cross_product(bc, bp);
+    let cross3 = cross_product(ca, cp);
+
+    let epsilon = 0.0001;
+
+    if cross1 > epsilon && cross2 > epsilon && cross3 > epsilon {
+        FaceLocateResult::Face
+    } else if cross1.abs() < epsilon && cross2.abs() < epsilon && cross3.abs() < epsilon {
+        FaceLocateResult::Vertex
+    } else if cross1.abs() < epsilon || cross2.abs() < epsilon || cross3.abs() < epsilon {
+        FaceLocateResult::Edge
+    } else {
+        FaceLocateResult::None
+    }
+}
+
+pub enum FaceLocateResult {
+    Face,
+    Edge,
+    Vertex,
+    None,
+}

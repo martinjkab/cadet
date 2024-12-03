@@ -110,7 +110,7 @@ impl CDT {
                 nxt: None,
                 rot: None,
             }));
-            println!("Adding sym edge: {:?}", sym.borrow().edge_indices());
+
             face_symedges.push(sym.clone());
 
             self.sym_edges_by_vertices
@@ -197,8 +197,6 @@ impl CDT {
             .collect::<Vec<_>>();
 
         let is_any_rot_of_this = which_is_rot_of_this.clone().len() > 0;
-
-        println!("Removing sym edge: {:?}", sym_edge.borrow().edge_indices());
 
         assert!(!is_any_rot_of_this);
     }
