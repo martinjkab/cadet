@@ -25,7 +25,7 @@ impl CDT {
         let face = Rc::new(RefCell::new(Face {
             id: self.face_id_counter,
             vertices,
-            edges: [edges[0].clone(), edges[1].clone(), edges[2].clone()],
+            edges: [edges[0], edges[1], edges[2]],
         }));
 
         edges.iter().for_each(|edge| {
@@ -33,17 +33,14 @@ impl CDT {
                 .edges
                 .binary_search_by(|x| x.borrow().edge_indices().ordered().cmp(&edge.ordered()));
 
-            match index {
-                Err(index) => {
-                    let edge = Rc::new(RefCell::new(Edge {
-                        a: self.vertices[edge.0].clone(),
-                        b: self.vertices[edge.1].clone(),
-                        crep: Default::default(),
-                    }));
+            if let Err(index) = index {
+                let edge = Rc::new(RefCell::new(Edge {
+                    a: self.vertices[edge.0].clone(),
+                    b: self.vertices[edge.1].clone(),
+                    crep: Default::default(),
+                }));
 
-                    self.edges.insert(index, edge.clone());
-                }
-                _ => {}
+                self.edges.insert(index, edge.clone());
             }
         });
 
@@ -75,7 +72,7 @@ impl CDT {
 
         // Remove face from sym_edges_by_edges
         for edge in face_borrowed.edges.iter() {
-            let to_remove = self.get_sym_edge_for_half_edge(&edge).unwrap();
+            let to_remove = self.get_sym_edge_for_half_edge(edge).unwrap();
 
             self.remove_sym_edge(to_remove);
         }
@@ -134,7 +131,7 @@ impl CDT {
         &self,
         edge: &(usize, usize),
     ) -> Option<Rc<RefCell<SymEdge>>> {
-        self.sym_edges_by_half_edges.get(&edge).cloned()
+        self.sym_edges_by_half_edges.get(edge).cloned()
     }
 
     pub fn get_all_sym_edges_for_edge(&self, edge: Rc<RefCell<Edge>>) -> Vec<Rc<RefCell<SymEdge>>> {
@@ -196,7 +193,7 @@ impl CDT {
             })
             .collect::<Vec<_>>();
 
-        let is_any_rot_of_this = which_is_rot_of_this.clone().len() > 0;
+        let is_any_rot_of_this = !which_is_rot_of_this.clone().is_empty();
 
         assert!(!is_any_rot_of_this);
     }

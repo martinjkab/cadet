@@ -3,11 +3,8 @@ use std::{cell::RefCell, collections::VecDeque, io::BufRead, rc::Rc};
 use glam::{DMat3, DVec2, DVec3};
 
 use crate::{
-    cdt::location::FastLocate,
     edge::Edge,
-    helper::is_point_in_triangle,
-    sym_edge,
-    symmetric_compare::{Flipped, SymmetricCompare, TupleOrdered},
+    symmetric_compare::{Flipped, SymmetricCompare},
     vertex::Vertex,
 };
 

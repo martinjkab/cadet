@@ -1,16 +1,12 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, rc::Rc};
 
-use geo::{Contains, Coord, InteriorPoint, Intersects};
+use geo::Coord;
 use glam::DVec2;
-use rand::seq::IteratorRandom;
 
 use crate::{
-    edge,
     face::Face,
-    helper::{is_point_in_triangle, FaceLocateResult},
     locate_result::LocateResult,
     orientation::Orientation,
-    sym_edge,
 };
 
 use super::cdt::CDT;
@@ -201,7 +197,7 @@ impl CDT {
     ) -> Option<Rc<RefCell<Face>>> {
         // Get the SymEdge corresponding to the edge
         let edge = &face.edges[edge_index];
-        let binding = self.get_sym_edge_for_half_edge(&edge)?;
+        let binding = self.get_sym_edge_for_half_edge(edge)?;
         let sym_edge = binding.borrow();
 
         sym_edge.neighbor_face()

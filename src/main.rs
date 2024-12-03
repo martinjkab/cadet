@@ -1,6 +1,5 @@
 use cdt::cdt::CDT;
 use glam::DVec2;
-use helper::is_crossing;
 use std::io::{self, BufRead};
 
 pub mod cdt;

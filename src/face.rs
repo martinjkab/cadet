@@ -1,6 +1,6 @@
 use std::{cell::RefCell, rc::Rc};
 
-use crate::{edge::Edge, sym_edge::SymEdge, vertex::Vertex};
+use crate::{edge::Edge, vertex::Vertex};
 
 #[derive(Clone, Debug)]
 pub struct Face {

@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{HashMap, VecDeque},
     rc::Rc,
 };
 
@@ -12,7 +12,7 @@ use crate::{
     helper::{intersection_point, is_crossing},
     locate_result::LocateResult,
     orientation::Orientation,
-    sym_edge::{self, SymEdge},
+    sym_edge::{SymEdge},
     symmetric_compare::{Flipped, SymmetricCompare},
     vertex::Vertex,
 };
@@ -136,8 +136,8 @@ impl CDT {
         self.remove_face(face_2.clone());
 
         // Get the edges that are diffferent from e
-        let face_1_edges = face_1.borrow().edges.clone();
-        let face_2_edges = face_2.borrow().edges.clone();
+        let face_1_edges = face_1.borrow().edges;
+        let face_2_edges = face_2.borrow().edges;
 
         let face_1_edges = face_1_edges
             .iter()
@@ -179,15 +179,14 @@ impl CDT {
 
         let mut edges = new_faces
             .iter()
-            .map(|face| face.borrow().edges.clone())
-            .flatten()
+            .flat_map(|face| face.borrow().edges)
             .filter(|edge| {
                 [face_1_edges.clone(), face_2_edges.clone()]
                     .iter()
                     .flatten()
                     .any(|face_edge| {
                         (face_edge.0.borrow().index, face_edge.1.borrow().index)
-                            .symmetric_compare(&edge)
+                            .symmetric_compare(edge)
                     })
             })
             .map(|edge| self.get_sym_edge_for_half_edge(&edge).unwrap())
@@ -236,13 +235,12 @@ impl CDT {
 
         let edges = new_faces
             .iter()
-            .map(|face| face.borrow().edges.clone())
-            .flatten()
+            .flat_map(|face| face.borrow().edges)
             .filter(|edge| {
                 face_borrowed
                     .edges
                     .iter()
-                    .any(|face_edge| face_edge.symmetric_compare(&edge))
+                    .any(|face_edge| face_edge.symmetric_compare(edge))
             })
             .map(|edge| self.get_sym_edge_for_half_edge(&edge).unwrap())
             .map(|edge| edge.borrow().edge.clone())
