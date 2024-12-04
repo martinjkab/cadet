@@ -45,13 +45,15 @@ impl CDT {
 
         indices.chunks(3).for_each(|c| {
             let v = c.iter().map(|&x| *x as usize).collect::<Vec<_>>();
-
+            println!("Adding face {:?}", v);
             cdt.add_face([
                 vertices[v[0]].clone(),
                 vertices[v[1]].clone(),
                 vertices[v[2]].clone(),
             ]);
         });
+
+        println!("Loaded model from {}", model_path);
 
         cdt
     }

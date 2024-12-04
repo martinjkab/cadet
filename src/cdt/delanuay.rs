@@ -135,7 +135,7 @@ impl CDT {
 
         let f2 = self.add_face([v1.clone(), v2.clone(), edge.borrow().b.clone()]);
 
-        self.export_to_obj("./models/output.obj");
+        // self.export_to_obj("./models/output.obj");
 
         //Waiting for user input
         // let mut input = String::new();

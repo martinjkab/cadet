@@ -7,9 +7,10 @@ use std::{
 use glam::DVec2;
 
 use crate::{
+    constraints::constraints::{ConstraintSegment, Constraints},
     edge::Edge,
     face::Face,
-    helper::{intersection_point, is_crossing},
+    helper::{intersection_point, is_ccw, is_crossing},
     locate_result::LocateResult,
     orientation::Orientation,
     sym_edge::SymEdge,
@@ -29,32 +30,20 @@ pub struct CDT {
 }
 
 impl CDT {
-    pub fn insert_constraint(
-        &mut self,
-        constraint_points: Vec<DVec2>, // List of points in the constraint
-        constraint_id: usize,          // ID of the constraint
-    ) {
+    pub fn add_constraints(&mut self, constraints: &Constraints) {
+        for constraint_segment in constraints.constraint_segments.iter() {
+            self.insert_constraint(constraint_segment);
+        }
+    }
+
+    pub fn insert_constraint(&mut self, constraint_segment: &ConstraintSegment) {
+        let constraint_id = constraint_segment.id;
+        let constraint_points = &constraint_segment.constraints;
         let mut vertex_list = Vec::new();
 
         for point in constraint_points.iter() {
             // Step 1: Locate the point in the triangulation
             let locate_result = self.locate_point(point);
-
-            // match locate_result {
-            //     LocateResult::Vertex(_) => {
-            //         println!("Vertex");
-            //     }
-            //     LocateResult::Edge(_) => {
-            //         println!("Edge");
-            //     }
-            //     LocateResult::Face(_) => {
-            //         println!("Face");
-            //     }
-            //     LocateResult::None => {
-            //         println!("None");
-            //         continue;
-            //     }
-            // }
 
             // Step 2: Handle the locate result
             let vertex = match locate_result {
@@ -76,25 +65,6 @@ impl CDT {
             let vs = vertex_list[i + 1].clone();
             self.insert_segment(v, vs, constraint_id);
         }
-    }
-
-    pub fn ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> f64 {
-        let ab = a - b;
-        let ac = a - c;
-
-        ab.x * ac.y - ab.y * ac.x
-    }
-
-    pub fn is_ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> Orientation {
-        let ccw = Self::ccw(a, b, c);
-        let distance = ccw.abs() / ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
-        if distance < 1e-6 {
-            return Orientation::Collinear;
-        }
-        if ccw > 0.0 {
-            return Orientation::CounterClockwise;
-        }
-        Orientation::Clockwise
     }
 
     fn insert_point_on_edge(
@@ -200,7 +170,7 @@ impl CDT {
         let mut edge_stack = VecDeque::new();
         edge_stack.extend(edges.clone());
 
-        self.export_to_obj("./models/output.obj");
+        // self.export_to_obj("./models/output.obj");
 
         //Waiting for user input
         // let mut input = String::new();
@@ -251,7 +221,7 @@ impl CDT {
         let mut edge_stack = VecDeque::new();
         edge_stack.extend(edges.clone());
 
-        self.export_to_obj("./models/output.obj");
+        // self.export_to_obj("./models/output.obj");
 
         //Waiting for user input
         // let mut input = String::new();
@@ -289,16 +259,6 @@ impl CDT {
 
         let crossing_vertices = self.find_crossing_vertices(start.clone(), end.clone());
 
-        println!(
-            "Crossing vertices of start {:?} and end {:?}: {:?}",
-            start.borrow().index,
-            end.borrow().index,
-            crossing_vertices
-                .iter()
-                .map(|v| v.borrow().index)
-                .collect::<Vec<_>>()
-        );
-
         for i in 0..crossing_vertices.len() - 1 {
             let start = crossing_vertices[i].clone();
             let end = crossing_vertices[i + 1].clone();
@@ -316,7 +276,7 @@ impl CDT {
 
             if let Some(edge) = edge {
                 edge.borrow_mut().insert_constraint(constraint_id);
-                return;
+                continue;
             }
 
             let edge_list = self.find_crossing_edges(start.clone(), end.clone());
@@ -327,12 +287,7 @@ impl CDT {
                 end.borrow().index,
                 edge_list
                     .iter()
-                    .map(|edge| {
-                        (
-                            edge.borrow().a.borrow().position,
-                            edge.borrow().b.borrow().position,
-                        )
-                    })
+                    .map(|edge| { edge.borrow().edge_indices() })
                     .collect::<Vec<_>>()
             );
 
@@ -372,7 +327,7 @@ impl CDT {
                 self.remove_face(face_1.clone());
                 self.remove_face(face_2.clone());
 
-                let is_ccw = Self::is_ccw(&a, &b, &c) == Orientation::CounterClockwise;
+                let is_ccw = is_ccw(&a, &b, &c) == Orientation::CounterClockwise;
 
                 if is_ccw {
                     top_vertices.push(edge.borrow().a.clone());
@@ -381,6 +336,10 @@ impl CDT {
                     top_vertices.push(edge.borrow().b.clone());
                     bottom_vertices.push(edge.borrow().a.clone());
                 }
+            }
+
+            if top_vertices.is_empty() || bottom_vertices.is_empty() {
+                continue;
             }
 
             let mut new_faces = Vec::new();

@@ -1,6 +1,8 @@
 use glam::DVec2;
 use intersection_detection::{Intersection, Line};
 
+use crate::orientation::Orientation;
+
 pub fn is_crossing(e1: &(DVec2, DVec2), e2: &(DVec2, DVec2)) -> bool {
     match intersection_point(e1, e2) {
         Some(p) => {
@@ -80,4 +82,23 @@ pub enum FaceLocateResult {
     Edge,
     Vertex,
     None,
+}
+
+pub fn ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> f64 {
+    let ab = a - b;
+    let ac = a - c;
+
+    ab.x * ac.y - ab.y * ac.x
+}
+
+pub fn is_ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> Orientation {
+    let ccw = ccw(a, b, c);
+    let distance = ccw.abs() / ((b.x - a.x).powi(2) + (b.y - a.y).powi(2)).sqrt();
+    if distance < 1e-6 {
+        return Orientation::Collinear;
+    }
+    if ccw > 0.0 {
+        return Orientation::CounterClockwise;
+    }
+    Orientation::Clockwise
 }

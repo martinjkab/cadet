@@ -3,11 +3,7 @@ use std::{cell::RefCell, rc::Rc};
 use geo::Coord;
 use glam::DVec2;
 
-use crate::{
-    face::Face,
-    locate_result::LocateResult,
-    orientation::Orientation,
-};
+use crate::{face::Face, helper::is_ccw, locate_result::LocateResult, orientation::Orientation};
 
 use super::cdt::CDT;
 
@@ -182,7 +178,7 @@ impl CDT {
             let a = triangle.vertices[i].borrow();
             let b = triangle.vertices[(i + 1) % 3].borrow();
 
-            let is_ccw = Self::is_ccw(&a.position, &b.position, p);
+            let is_ccw = is_ccw(&a.position, &b.position, p);
             if is_ccw == Orientation::Collinear {
                 return true;
             }
