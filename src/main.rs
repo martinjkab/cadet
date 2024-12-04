@@ -3,6 +3,7 @@ use glam::DVec2;
 use std::io::{self, BufRead};
 
 pub mod cdt;
+pub mod constraints;
 pub mod edge;
 pub mod face;
 pub mod helper;
@@ -49,13 +50,6 @@ fn main() {
             DVec2 { x: 0.5, y: 0.5 },
             DVec2 { x: -0.5, y: 0.5 },
             DVec2 { x: -0.5, y: -0.5 },
-            // DVec2 { x: 0., y: 0. },
-            // DVec2 { x: -0.5, y: -0.5 },
-            // DVec2 { x: 0.5, y: -0.5 },
-            // DVec2 { x: 0.5, y: 0.5 },
-            // DVec2 { x: -0.5, y: 0.5 },
-            // DVec2 { x: -0.5, y: -0.5 },
-            // DVec2 { x: 0., y: 0. },
         ]
         .to_vec(),
         0,

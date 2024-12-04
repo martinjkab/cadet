@@ -33,8 +33,7 @@ impl CDT {
         while let Some(e) = edge_stack.pop_front() {
             {
                 let e_borrowed = e.borrow();
-                if !e_borrowed.crep.is_empty() {
-                    println!("Edge {:?} is constrained", e_borrowed.edge_indices());
+                if e_borrowed.is_constrained() {
                     continue;
                 }
 
@@ -94,7 +93,7 @@ impl CDT {
                 );
 
                 if is_delanuay {
-                    continue; // Skip if the edge is already Delaunay
+                    continue;
                 }
 
                 let different_edges = face_borrowed

@@ -17,6 +17,10 @@ impl Edge {
     pub fn insert_constraint(&mut self, constraint: usize) {
         self.crep.insert(constraint);
     }
+
+    pub fn is_constrained(&self) -> bool {
+        !self.crep.is_empty()
+    }
 }
 
 impl std::fmt::Display for Edge {

@@ -268,140 +268,173 @@ impl CDT {
         end: Rc<RefCell<Vertex>>,
         constraint_id: usize,
     ) {
-        let mut edge_list = self.find_crossed_edges(start.clone(), end.clone());
+        let edge_list = self.find_crossing_edges(start.clone(), end.clone());
 
-        println!(
-            "Edge list: {:?}",
-            edge_list
-                .iter()
-                .map(|e| e.borrow().edge_indices())
-                .collect::<Vec<_>>()
-        );
-
-        // Check if start and end are connected by an edge
-        let edge = self
-            .edges
+        let constrained_edges = edge_list
             .iter()
-            .find(|edge| {
-                let edge = edge.borrow();
-                (edge.a.as_ptr() == start.as_ptr() && edge.b.as_ptr() == end.as_ptr())
-                    || (edge.a.as_ptr() == end.as_ptr() && edge.b.as_ptr() == start.as_ptr())
-            })
-            .cloned();
+            .filter(|edge| edge.borrow().is_constrained());
 
-        if let Some(edge) = edge {
-            println!("Edge found: {:?}", edge.borrow().edge_indices());
-            edge.borrow_mut().insert_constraint(constraint_id);
-            return;
-        }
-
-        if edge_list.is_empty() {
-            return;
-        }
-
-        let mut top_vertices = Vec::new();
-        let mut bottom_vertices = Vec::new();
-
-        for edge in edge_list.iter() {
+        for edge in constrained_edges {
             let a = start.borrow().position;
             let b = end.borrow().position;
             let c = edge.borrow().a.borrow().position;
             let d = edge.borrow().b.borrow().position;
 
-            let edge_indices = edge.borrow().edge_indices();
+            if !edge.borrow().crep.is_empty() {
+                let intersection_point = intersection_point(&(a, b), &(c, d)).unwrap();
 
-            // Delete all triangles that contain the edge
-            let sym_edge = self
-                .get_sym_edge_for_half_edge(&edge_indices)
-                .or_else(|| self.get_sym_edge_for_half_edge(&edge_indices.flipped()));
-
-            let sym_edge = match sym_edge {
-                Some(sym_edge) => sym_edge,
-                None => {
-                    continue;
-                }
-            };
-
-            let face_1 = sym_edge.borrow().face.clone();
-            let face_2 = sym_edge.borrow().neighbor_face();
-
-            let face_2 = match face_2 {
-                Some(face) => face,
-                None => {
-                    continue;
-                }
-            };
-
-            self.remove_face(face_1.clone());
-            self.remove_face(face_2.clone());
-
-            let is_ccw = Self::is_ccw(&a, &b, &c) == Orientation::CounterClockwise;
-
-            if is_ccw {
-                top_vertices.push(edge.borrow().a.clone());
-                bottom_vertices.push(edge.borrow().b.clone());
-            } else {
-                top_vertices.push(edge.borrow().b.clone());
-                bottom_vertices.push(edge.borrow().a.clone());
+                self.insert_point_on_edge(intersection_point, edge.clone());
             }
         }
 
-        let mut new_faces = Vec::new();
-
-        for i in 0..top_vertices.len() - 1 {
-            let v = top_vertices[i].clone();
-            let vs = top_vertices[i + 1].clone();
-
-            new_faces.push(self.add_face([start.clone(), v.clone(), vs.clone()]));
-        }
-
-        for i in 0..bottom_vertices.len() - 1 {
-            let v = bottom_vertices[i].clone();
-            let vs = bottom_vertices[i + 1].clone();
-
-            new_faces.push(self.add_face([start.clone(), vs.clone(), v.clone()]));
-        }
-
-        // Insert the finsishing triangles
-        let v = top_vertices.last().unwrap().clone();
-        let vs = bottom_vertices.last().unwrap().clone();
-
-        let face_1 = self.add_face([start.clone(), end.clone(), v.clone()]);
-        let face_2 = self.add_face([end.clone(), start.clone(), vs.clone()]);
-
-        new_faces.push(face_1.clone());
-        new_faces.push(face_2.clone());
-
-        let new_edge = self
-            .get_sym_edge_for_half_edge(&face_1.borrow().edges[0])
-            .unwrap();
-        let new_edge = new_edge.borrow().edge.clone();
-        new_edge.borrow_mut().insert_constraint(constraint_id);
+        let crossing_vertices = self.find_crossing_vertices(start.clone(), end.clone());
 
         println!(
-            "Added constraint edge {:?}",
-            new_edge.borrow().edge_indices()
+            "Crossing vertices of start {:?} and end {:?}: {:?}",
+            start.borrow().index,
+            end.borrow().index,
+            crossing_vertices
+                .iter()
+                .map(|v| v.borrow().index)
+                .collect::<Vec<_>>()
         );
 
-        let mut edges = VecDeque::new();
+        for i in 0..crossing_vertices.len() - 1 {
+            let start = crossing_vertices[i].clone();
+            let end = crossing_vertices[i + 1].clone();
 
-        for i in new_faces.iter() {
-            let face = i.borrow();
-            for edge in face.edges.iter() {
-                edges.push_back(
-                    self.get_sym_edge_for_half_edge(edge)
-                        .unwrap()
-                        .borrow()
-                        .edge
-                        .clone(),
-                );
+            // Check if start and end are connected by an edge
+            let edge = self
+                .edges
+                .iter()
+                .find(|edge| {
+                    let edge = edge.borrow();
+                    (edge.a.as_ptr() == start.as_ptr() && edge.b.as_ptr() == end.as_ptr())
+                        || (edge.a.as_ptr() == end.as_ptr() && edge.b.as_ptr() == start.as_ptr())
+                })
+                .cloned();
+
+            if let Some(edge) = edge {
+                edge.borrow_mut().insert_constraint(constraint_id);
+                return;
             }
-        }
 
-        self.flip_edges(v.clone(), &mut edges);
+            let edge_list = self.find_crossing_edges(start.clone(), end.clone());
+
+            println!(
+                "Crossing edges of start {:?} and end {:?}: {:?}",
+                start.borrow().index,
+                end.borrow().index,
+                edge_list
+                    .iter()
+                    .map(|edge| {
+                        (
+                            edge.borrow().a.borrow().position,
+                            edge.borrow().b.borrow().position,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+            );
+
+            let mut top_vertices = Vec::new();
+            let mut bottom_vertices = Vec::new();
+
+            for edge in edge_list.iter() {
+                let a = start.borrow().position;
+                let b = end.borrow().position;
+                let c = edge.borrow().a.borrow().position;
+                let d = edge.borrow().b.borrow().position;
+
+                let edge_indices = edge.borrow().edge_indices();
+
+                // Delete all triangles that contain the edge
+                let sym_edge = self
+                    .get_sym_edge_for_half_edge(&edge_indices)
+                    .or_else(|| self.get_sym_edge_for_half_edge(&edge_indices.flipped()));
+
+                let sym_edge = match sym_edge {
+                    Some(sym_edge) => sym_edge,
+                    None => {
+                        continue;
+                    }
+                };
+
+                let face_1 = sym_edge.borrow().face.clone();
+                let face_2 = sym_edge.borrow().neighbor_face();
+
+                let face_2 = match face_2 {
+                    Some(face) => face,
+                    None => {
+                        continue;
+                    }
+                };
+
+                self.remove_face(face_1.clone());
+                self.remove_face(face_2.clone());
+
+                let is_ccw = Self::is_ccw(&a, &b, &c) == Orientation::CounterClockwise;
+
+                if is_ccw {
+                    top_vertices.push(edge.borrow().a.clone());
+                    bottom_vertices.push(edge.borrow().b.clone());
+                } else {
+                    top_vertices.push(edge.borrow().b.clone());
+                    bottom_vertices.push(edge.borrow().a.clone());
+                }
+            }
+
+            let mut new_faces = Vec::new();
+
+            for i in 0..top_vertices.len() - 1 {
+                let v = top_vertices[i].clone();
+                let vs = top_vertices[i + 1].clone();
+
+                new_faces.push(self.add_face([start.clone(), v.clone(), vs.clone()]));
+            }
+
+            for i in 0..bottom_vertices.len() - 1 {
+                let v = bottom_vertices[i].clone();
+                let vs = bottom_vertices[i + 1].clone();
+
+                new_faces.push(self.add_face([start.clone(), vs.clone(), v.clone()]));
+            }
+
+            // Insert the finsishing triangles
+            let v = top_vertices.last().unwrap().clone();
+            let vs = bottom_vertices.last().unwrap().clone();
+
+            let face_1 = self.add_face([start.clone(), end.clone(), v.clone()]);
+            let face_2 = self.add_face([end.clone(), start.clone(), vs.clone()]);
+
+            new_faces.push(face_1.clone());
+            new_faces.push(face_2.clone());
+
+            let new_edge = self
+                .get_sym_edge_for_half_edge(&face_1.borrow().edges[0])
+                .unwrap();
+            let new_edge = new_edge.borrow().edge.clone();
+            new_edge.borrow_mut().insert_constraint(constraint_id);
+
+            let mut edges = VecDeque::new();
+
+            for i in new_faces.iter() {
+                let face = i.borrow();
+                for edge in face.edges.iter() {
+                    edges.push_back(
+                        self.get_sym_edge_for_half_edge(edge)
+                            .unwrap()
+                            .borrow()
+                            .edge
+                            .clone(),
+                    );
+                }
+            }
+
+            self.flip_edges(v.clone(), &mut edges);
+        }
     }
 
-    fn find_crossed_edges(
+    fn find_crossing_edges(
         &self,
         start: Rc<RefCell<Vertex>>,
         end: Rc<RefCell<Vertex>>,
@@ -513,5 +546,47 @@ impl CDT {
         // }
 
         edge_list
+    }
+
+    fn find_crossing_vertices(
+        &self,
+        start: Rc<RefCell<Vertex>>,
+        end: Rc<RefCell<Vertex>>,
+    ) -> Vec<Rc<RefCell<Vertex>>> {
+        let mut vertex_list = Vec::new();
+
+        let a = start.borrow().position;
+        let b = end.borrow().position;
+
+        for v in self.vertices.iter() {
+            let p = v.borrow().position;
+            let cross_product = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+
+            if cross_product.abs() > 1e-9 {
+                continue;
+            }
+
+            if p.x < a.x.min(b.x) || p.x > a.x.max(b.x) {
+                continue;
+            }
+            if p.y < a.y.min(b.y) || p.y > a.y.max(b.y) {
+                continue;
+            }
+
+            vertex_list.push(v.clone());
+        }
+
+        //Sort vertex list by the distance of the start vertex and the intersection point
+        vertex_list.sort_by(|a, b| {
+            let a = a.borrow().position;
+            let b = b.borrow().position;
+
+            let a_length = (a - start.borrow().position).length();
+            let b_length = (b - start.borrow().position).length();
+
+            a_length.partial_cmp(&b_length).unwrap()
+        });
+
+        vertex_list
     }
 }
