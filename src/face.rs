@@ -6,12 +6,40 @@ use crate::{edge::Edge, vertex::Vertex};
 pub struct Face {
     pub id: usize,
     pub vertices: [Rc<RefCell<Vertex>>; 3],
-    pub edges: [(usize, usize); 3],
 }
 
 impl Face {
+    pub fn edges(&self) -> [(usize, usize); 3] {
+        [
+            (
+                self.vertices[0].borrow().index,
+                self.vertices[1].borrow().index,
+            ),
+            (
+                self.vertices[1].borrow().index,
+                self.vertices[2].borrow().index,
+            ),
+            (
+                self.vertices[2].borrow().index,
+                self.vertices[0].borrow().index,
+            ),
+        ]
+    }
     pub fn edge_indices(&self) -> [(usize, usize); 3] {
-        self.edges
+        [
+            (
+                self.vertices[0].borrow().index,
+                self.vertices[1].borrow().index,
+            ),
+            (
+                self.vertices[1].borrow().index,
+                self.vertices[2].borrow().index,
+            ),
+            (
+                self.vertices[2].borrow().index,
+                self.vertices[0].borrow().index,
+            ),
+        ]
     }
 
     pub fn vertex_indices(&self) -> [usize; 3] {

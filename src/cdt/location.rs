@@ -144,7 +144,7 @@ impl CDT {
 
             let is_point_in_triangle = tri.locate_point(p);
             if is_point_in_triangle {
-                for edge in &face.borrow().edges {
+                for edge in &face.borrow().edges() {
                     let sym_edge = self.get_sym_edge_for_half_edge(edge).unwrap();
                     let edge = sym_edge.borrow().edge.clone();
 
@@ -192,7 +192,7 @@ impl CDT {
         edge_index: usize,
     ) -> Option<Rc<RefCell<Face>>> {
         // Get the SymEdge corresponding to the edge
-        let edge = &face.edges[edge_index];
+        let edge = &face.edges()[edge_index];
         let binding = self.get_sym_edge_for_half_edge(edge)?;
         let sym_edge = binding.borrow();
 

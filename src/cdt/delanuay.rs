@@ -97,7 +97,7 @@ impl CDT {
                 }
 
                 let different_edges = face_borrowed
-                    .edges
+                    .edges()
                     .iter()
                     .filter(|x| !(**x).symmetric_compare(&e_borrowed.edge_indices()))
                     .map(|x| self.get_sym_edge_for_half_edge(x).unwrap())

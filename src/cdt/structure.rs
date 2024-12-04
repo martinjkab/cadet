@@ -25,7 +25,6 @@ impl CDT {
         let face = Rc::new(RefCell::new(Face {
             id: self.face_id_counter,
             vertices,
-            edges: [edges[0], edges[1], edges[2]],
         }));
 
         edges.iter().for_each(|edge| {
@@ -71,7 +70,7 @@ impl CDT {
         assert_eq!(self.faces.len(), len_before - 1);
 
         // Remove face from sym_edges_by_edges
-        for edge in face_borrowed.edges.iter() {
+        for edge in face_borrowed.edges().iter() {
             let to_remove = self.get_sym_edge_for_half_edge(edge).unwrap();
 
             self.remove_sym_edge(to_remove);
@@ -92,7 +91,7 @@ impl CDT {
     pub fn build_symedges_for_face(&mut self, face: Rc<RefCell<Face>>) -> Result<(), String> {
         let mut face_symedges = Vec::new();
 
-        for (i, edge) in face.borrow().edges.iter().enumerate() {
+        for (i, edge) in face.borrow().edges().iter().enumerate() {
             let vertex = face.borrow().vertices[i].clone();
             let edge = self
                 .edges

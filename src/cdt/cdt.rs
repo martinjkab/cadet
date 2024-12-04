@@ -10,7 +10,7 @@ use crate::{
     constraints::constraints::{ConstraintSegment, Constraints},
     edge::Edge,
     face::Face,
-    helper::{intersection_point, is_ccw, is_crossing},
+    helper::{intersection_point, is_ccw, is_crossing, ProjectToLine},
     locate_result::LocateResult,
     orientation::Orientation,
     sym_edge::SymEdge,
@@ -54,7 +54,7 @@ impl CDT {
             })
             .collect::<Vec<_>>();
 
-        // // Step 4: Insert segments between successive vertices
+        // // Step 3: Insert segments between successive vertices
         for i in 0..vertex_list.len() - 1 {
             let v = vertex_list[i].clone();
             let vs = vertex_list[i + 1].clone();
@@ -70,17 +70,8 @@ impl CDT {
         let edge = edge.borrow();
         let a = edge.a.borrow();
         let b = edge.b.borrow();
-
-        // Project the point onto the line
-        let ab = b.position - a.position;
-        let ap = point - a.position;
-
-        let t = ap.dot(ab) / ab.dot(ab);
-
-        let position = a.position + ab * t;
-
+        let position = point.project_to_line(&(a.position, b.position));
         let v = self.add_vertex(position, 1);
-
         let edge_indices = edge.edge_indices();
 
         let sym_edge = self.get_sym_edge_for_half_edge(&edge_indices).unwrap();
@@ -101,8 +92,8 @@ impl CDT {
         self.remove_face(face_2.clone());
 
         // Get the edges that are diffferent from e
-        let face_1_edges = face_1.borrow().edges;
-        let face_2_edges = face_2.borrow().edges;
+        let face_1_edges = face_1.borrow().edges();
+        let face_2_edges = face_2.borrow().edges();
 
         let face_1_edges = face_1_edges
             .iter()
@@ -119,32 +110,15 @@ impl CDT {
         assert!(face_1_edges.len() == 2);
         assert!(face_2_edges.len() == 2);
 
-        let new_faces = [
-            self.add_face([
-                face_1_edges[0].0.clone(),
-                face_1_edges[0].1.clone(),
-                v.clone(),
-            ]),
-            self.add_face([
-                face_2_edges[0].0.clone(),
-                face_2_edges[0].1.clone(),
-                v.clone(),
-            ]),
-            self.add_face([
-                face_1_edges[1].0.clone(),
-                face_1_edges[1].1.clone(),
-                v.clone(),
-            ]),
-            self.add_face([
-                face_2_edges[1].0.clone(),
-                face_2_edges[1].1.clone(),
-                v.clone(),
-            ]),
-        ];
+        let new_faces = face_1_edges
+            .iter()
+            .chain(face_2_edges.iter())
+            .map(|(a, b)| self.add_face([a.clone(), b.clone(), v.clone()]))
+            .collect::<Vec<_>>();
 
         let mut edges = new_faces
             .iter()
-            .flat_map(|face| face.borrow().edges)
+            .flat_map(|face| face.borrow().edges())
             .filter(|edge| {
                 [face_1_edges.clone(), face_2_edges.clone()]
                     .iter()
@@ -188,7 +162,7 @@ impl CDT {
         let face_borrowed = face.borrow();
 
         let new_faces = face_borrowed
-            .edges
+            .edges()
             .iter()
             .map(|edge| {
                 let edge = (self.vertices[edge.0].clone(), self.vertices[edge.1].clone());
@@ -200,10 +174,10 @@ impl CDT {
 
         let edges = new_faces
             .iter()
-            .flat_map(|face| face.borrow().edges)
+            .flat_map(|face| face.borrow().edges())
             .filter(|edge| {
                 face_borrowed
-                    .edges
+                    .edges()
                     .iter()
                     .any(|face_edge| face_edge.symmetric_compare(edge))
             })
@@ -364,7 +338,7 @@ impl CDT {
             new_faces.push(face_2.clone());
 
             let new_edge = self
-                .get_sym_edge_for_half_edge(&face_1.borrow().edges[0])
+                .get_sym_edge_for_half_edge(&face_1.borrow().edges()[0])
                 .unwrap();
             let new_edge = new_edge.borrow().edge.clone();
             new_edge.borrow_mut().insert_constraint(constraint_id);
@@ -373,7 +347,7 @@ impl CDT {
 
             for i in new_faces.iter() {
                 let face = i.borrow();
-                for edge in face.edges.iter() {
+                for edge in face.edges().iter() {
                     edges.push_back(
                         self.get_sym_edge_for_half_edge(edge)
                             .unwrap()

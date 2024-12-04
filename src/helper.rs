@@ -102,3 +102,19 @@ pub fn is_ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> Orientation {
     }
     Orientation::Clockwise
 }
+
+pub trait ProjectToLine {
+    fn project_to_line(&self, line: &(DVec2, DVec2)) -> DVec2;
+}
+
+impl ProjectToLine for DVec2 {
+    fn project_to_line(&self, line: &(DVec2, DVec2)) -> DVec2 {
+        let (a, b) = line;
+        let ab = b - a;
+        let ap = self - a;
+
+        let t = ap.dot(ab) / ab.dot(ab);
+
+        a + ab * t
+    }
+}
