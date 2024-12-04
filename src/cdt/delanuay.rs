@@ -3,6 +3,7 @@ use std::{cell::RefCell, collections::VecDeque, io::BufRead, rc::Rc};
 use glam::{DMat3, DVec2, DVec3};
 
 use crate::{
+    cdt::location::FastLocate,
     edge::Edge,
     symmetric_compare::{Flipped, SymmetricCompare},
     vertex::Vertex,
@@ -12,15 +13,15 @@ use super::cdt::CDT;
 
 impl CDT {
     // Check if an edge is Delaunay using the in-circle test
-    fn is_delaunay(a: DVec2, b: DVec2, c: DVec2, d: DVec2) -> bool {
+    pub fn is_delaunay(a: DVec2, b: DVec2, c: DVec2, d: DVec2) -> bool {
         let matrix: DMat3 = DMat3::from_cols(
             DVec3::new(a.x - d.x, a.y - d.y, (a - d).dot(a - d)),
             DVec3::new(b.x - d.x, b.y - d.y, (b - d).dot(b - d)),
             DVec3::new(c.x - d.x, c.y - d.y, (c - d).dot(c - d)),
         );
         let det = matrix.determinant();
-        println!("Determinant: {}", det);
-        det >= 0.0
+
+        det >= -1e-8
     }
 
     // Edge-flipping routine
@@ -31,7 +32,6 @@ impl CDT {
     ) {
         while let Some(e) = edge_stack.pop_front() {
             {
-                println!("Checking edge {:?}", e.borrow().edge_indices());
                 let e_borrowed = e.borrow();
                 if !e_borrowed.crep.is_empty() {
                     println!("Edge {:?} is constrained", e_borrowed.edge_indices());
@@ -54,37 +54,50 @@ impl CDT {
 
                 let sym_edge = sym_edge_rc.borrow();
 
-                let face = sym_edge.face.borrow();
-
-                let neighbor_face = match sym_edge.neighbor_face() {
+                let neighbor_face_rc = match sym_edge.neighbor_face() {
                     Some(face) => face,
                     None => {
-                        println!(
-                            "No neighbor face found for edge {:?}",
-                            e_borrowed.edge_indices()
-                        );
                         continue;
                     }
                 };
-                let neighbor_face = neighbor_face.borrow();
+
+                let mut face_borrowed = sym_edge.face.borrow_mut();
+                let mut neighbor_face = neighbor_face_rc.borrow_mut();
+
+                let tri = geo::Triangle::new(
+                    geo::Coord {
+                        x: face_borrowed.vertices[0].borrow().position.x,
+                        y: face_borrowed.vertices[0].borrow().position.y,
+                    },
+                    geo::Coord {
+                        x: face_borrowed.vertices[1].borrow().position.x,
+                        y: face_borrowed.vertices[1].borrow().position.y,
+                    },
+                    geo::Coord {
+                        x: face_borrowed.vertices[2].borrow().position.x,
+                        y: face_borrowed.vertices[2].borrow().position.y,
+                    },
+                );
+
+                //If point is inside face, swap the faces
+                if tri.locate_point(&p.borrow().position) {
+                    std::mem::swap(&mut face_borrowed, &mut neighbor_face);
+                }
 
                 let o_vertex = neighbor_face.opposite_vertex(&e_borrowed);
                 let o = o_vertex.borrow();
                 let is_delanuay = Self::is_delaunay(
-                    face.vertices[0].borrow().position,
-                    face.vertices[1].borrow().position,
-                    face.vertices[2].borrow().position,
+                    face_borrowed.vertices[0].borrow().position,
+                    face_borrowed.vertices[1].borrow().position,
+                    face_borrowed.vertices[2].borrow().position,
                     o.position,
                 );
 
                 if is_delanuay {
-                    println!("Edge {:?} is Delaunay", e_borrowed.edge_indices());
                     continue; // Skip if the edge is already Delaunay
                 }
 
-                println!("Neighboring face: {:?}", neighbor_face.vertex_indices());
-
-                let different_edges = face
+                let different_edges = face_borrowed
                     .edges
                     .iter()
                     .filter(|x| !(**x).symmetric_compare(&e_borrowed.edge_indices()))
@@ -94,17 +107,8 @@ impl CDT {
 
                 assert_eq!(different_edges.len(), 2);
 
-                println!(
-                    "Pushing to stack: {:?}",
-                    different_edges[0].borrow().edge_indices()
-                );
-                println!(
-                    "Pushing to stack: {:?}",
-                    different_edges[1].borrow().edge_indices()
-                );
-
-                edge_stack.push_front(different_edges[0].clone());
-                edge_stack.push_front(different_edges[1].clone());
+                edge_stack.push_back(different_edges[0].clone());
+                edge_stack.push_back(different_edges[1].clone());
             }
 
             self.flip_edge(e.clone());
@@ -127,12 +131,6 @@ impl CDT {
         self.remove_face(f1.clone());
         self.remove_face(f2.clone());
 
-        println!(
-            "Flipping edge: {:?} to {:?}",
-            sym_edge.borrow().edge.borrow().edge_indices(),
-            (v1.borrow().index, v2.borrow().index)
-        );
-
         // Create two completely new faces
         let f1 = self.add_face([v2.clone(), v1.clone(), edge.borrow().a.clone()]);
 
@@ -141,7 +139,7 @@ impl CDT {
         self.export_to_obj("./models/output.obj");
 
         //Waiting for user input
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
+        // let mut input = String::new();
+        // std::io::stdin().read_line(&mut input).unwrap();
     }
 }

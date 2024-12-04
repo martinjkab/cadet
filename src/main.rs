@@ -44,17 +44,17 @@ fn main() {
 
     cdt.insert_constraint(
         [
-            DVec2 { x: -0.25, y: -0.25 },
-            DVec2 { x: 0.25, y: -0.25 },
-            DVec2 { x: 0.25, y: 0.25 },
-            // DVec2 { x: -0.25, y: 0.25 },
-            // DVec2 { x: -0.25, y: -0.25 },
+            DVec2 { x: -0.5, y: -0.5 },
+            DVec2 { x: 0.5, y: -0.5 },
+            DVec2 { x: 0.5, y: 0.5 },
+            DVec2 { x: -0.5, y: 0.5 },
+            DVec2 { x: -0.5, y: -0.5 },
             // DVec2 { x: 0., y: 0. },
-            // DVec2 { x: -0.25, y: -0.25 },
-            // DVec2 { x: 0.25, y: -0.25 },
-            // DVec2 { x: 0.25, y: 0.25 },
-            // DVec2 { x: -0.25, y: 0.25 },
-            // DVec2 { x: -0.25, y: -0.25 },
+            // DVec2 { x: -0.5, y: -0.5 },
+            // DVec2 { x: 0.5, y: -0.5 },
+            // DVec2 { x: 0.5, y: 0.5 },
+            // DVec2 { x: -0.5, y: 0.5 },
+            // DVec2 { x: -0.5, y: -0.5 },
             // DVec2 { x: 0., y: 0. },
         ]
         .to_vec(),
@@ -63,11 +63,17 @@ fn main() {
 
     // cdt.insert_constraint([DVec2 { x: 0., y: 0. }].to_vec(), 0);
 
-    // cdt.insert_constraint(
-    //     generate_circle(DVec2 { x: 0., y: 0. }, 0.75, 32).to_vec(),
-    //     0,
-    // );
-    // cdt.insert_constraint(generate_circle(DVec2 { x: 0., y: 0. }, 0.25, 8).to_vec(), 0);
+    cdt.insert_constraint(
+        generate_circle(DVec2 { x: 0., y: 0.125 }, 0.25, 32).to_vec(),
+        1,
+    );
+
+    cdt.insert_constraint(
+        generate_circle(DVec2 { x: 0., y: -0.125 }, 0.25, 32).to_vec(),
+        2,
+    );
+
+    // cdt.insert_constraint(generate_circle(DVec2 { x: 0., y: 0. }, 0.5, 8).to_vec(), 0);
 
     // cdt.insert_constraint(
     //     generate_line(100, DVec2 { x: -1.0, y: 1.0 }, DVec2 { x: 1.0, y: -1.0 }),
@@ -75,7 +81,7 @@ fn main() {
     // );
 
     // cdt.insert_constraint(
-    //     [DVec2 { x: -0.75, y: -0.5 }, DVec2 { x: 0.75, y: -0.5 }].to_vec(),
+    //     [DVec2 { x: -0.5, y: -0.5 }, DVec2 { x: 0.5, y: -0.5 }].to_vec(),
     //     0,
     // );
 
@@ -92,6 +98,30 @@ fn main() {
 
         assert!(is_any_face);
     }
+
+    //Verify that every edge is delaunay
+    // for sym_edge in cdt.sym_edges_by_half_edges.values() {
+    //     let sym_edge = sym_edge.borrow();
+    //     let neighbor_face = sym_edge.neighbor_face();
+
+    //     let neighbor_face = match neighbor_face {
+    //         Some(neighbor_face) => neighbor_face,
+    //         None => continue,
+    //     };
+
+    //     let is_delanuay = CDT::is_delaunay(
+    //         sym_edge.face.borrow().vertices[0].borrow().position,
+    //         sym_edge.face.borrow().vertices[1].borrow().position,
+    //         sym_edge.face.borrow().vertices[2].borrow().position,
+    //         neighbor_face
+    //             .borrow()
+    //             .opposite_vertex(&sym_edge.edge.borrow())
+    //             .borrow()
+    //             .position,
+    //     );
+
+    //     assert!(is_delanuay);
+    // }
 
     cdt.export_to_obj(&output_path);
 }

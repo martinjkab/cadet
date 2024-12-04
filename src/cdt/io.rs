@@ -81,6 +81,6 @@ impl CDT {
 
         writer.flush().expect("Failed to flush buffer");
 
-        println!("Exported to {}", model_path);
+        // println!("Exported to {}", model_path);
     }
 }

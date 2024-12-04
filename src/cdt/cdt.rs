@@ -12,7 +12,7 @@ use crate::{
     helper::{intersection_point, is_crossing},
     locate_result::LocateResult,
     orientation::Orientation,
-    sym_edge::{SymEdge},
+    sym_edge::SymEdge,
     symmetric_compare::{Flipped, SymmetricCompare},
     vertex::Vertex,
 };
@@ -40,21 +40,21 @@ impl CDT {
             // Step 1: Locate the point in the triangulation
             let locate_result = self.locate_point(point);
 
-            match locate_result {
-                LocateResult::Vertex(_) => {
-                    println!("Vertex");
-                }
-                LocateResult::Edge(_) => {
-                    println!("Edge");
-                }
-                LocateResult::Face(_) => {
-                    println!("Face");
-                }
-                LocateResult::None => {
-                    println!("None");
-                    continue;
-                }
-            }
+            // match locate_result {
+            //     LocateResult::Vertex(_) => {
+            //         println!("Vertex");
+            //     }
+            //     LocateResult::Edge(_) => {
+            //         println!("Edge");
+            //     }
+            //     LocateResult::Face(_) => {
+            //         println!("Face");
+            //     }
+            //     LocateResult::None => {
+            //         println!("None");
+            //         continue;
+            //     }
+            // }
 
             // Step 2: Handle the locate result
             let vertex = match locate_result {
@@ -71,11 +71,11 @@ impl CDT {
         }
 
         // // Step 4: Insert segments between successive vertices
-        // for i in 0..vertex_list.len() - 1 {
-        //     let v = vertex_list[i].clone();
-        //     let vs = vertex_list[i + 1].clone();
-        //     self.insert_segment(v, vs, constraint_id);
-        // }
+        for i in 0..vertex_list.len() - 1 {
+            let v = vertex_list[i].clone();
+            let vs = vertex_list[i + 1].clone();
+            self.insert_segment(v, vs, constraint_id);
+        }
     }
 
     pub fn ccw(a: &DVec2, b: &DVec2, c: &DVec2) -> f64 {
@@ -203,8 +203,8 @@ impl CDT {
         self.export_to_obj("./models/output.obj");
 
         //Waiting for user input
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
+        // let mut input = String::new();
+        // std::io::stdin().read_line(&mut input).unwrap();
 
         self.flip_edges(v.clone(), &mut edge_stack);
 
@@ -254,8 +254,8 @@ impl CDT {
         self.export_to_obj("./models/output.obj");
 
         //Waiting for user input
-        let mut input = String::new();
-        std::io::stdin().read_line(&mut input).unwrap();
+        // let mut input = String::new();
+        // std::io::stdin().read_line(&mut input).unwrap();
 
         self.flip_edges(v.clone(), &mut edge_stack);
 
@@ -270,49 +270,43 @@ impl CDT {
     ) {
         let mut edge_list = self.find_crossed_edges(start.clone(), end.clone());
 
+        println!(
+            "Edge list: {:?}",
+            edge_list
+                .iter()
+                .map(|e| e.borrow().edge_indices())
+                .collect::<Vec<_>>()
+        );
+
+        // Check if start and end are connected by an edge
+        let edge = self
+            .edges
+            .iter()
+            .find(|edge| {
+                let edge = edge.borrow();
+                (edge.a.as_ptr() == start.as_ptr() && edge.b.as_ptr() == end.as_ptr())
+                    || (edge.a.as_ptr() == end.as_ptr() && edge.b.as_ptr() == start.as_ptr())
+            })
+            .cloned();
+
+        if let Some(edge) = edge {
+            println!("Edge found: {:?}", edge.borrow().edge_indices());
+            edge.borrow_mut().insert_constraint(constraint_id);
+            return;
+        }
+
         if edge_list.is_empty() {
             return;
         }
+
         let mut top_vertices = Vec::new();
         let mut bottom_vertices = Vec::new();
-
-        //Sort edge list by the distance of the start vertex and the intersection point
-        edge_list.sort_by(|a, b| {
-            let a = a.borrow();
-            let b = b.borrow();
-
-            let a = intersection_point(
-                &(start.borrow().position, end.borrow().position),
-                &(a.a.borrow().position, a.b.borrow().position),
-            )
-            .unwrap();
-
-            let b = intersection_point(
-                &(start.borrow().position, end.borrow().position),
-                &(b.a.borrow().position, b.b.borrow().position),
-            )
-            .unwrap();
-
-            let a_length = (a - start.borrow().position).length();
-
-            let b_length = (b - start.borrow().position).length();
-
-            a_length.partial_cmp(&b_length).unwrap()
-        });
-
-        let edge_list = edge_list;
 
         for edge in edge_list.iter() {
             let a = start.borrow().position;
             let b = end.borrow().position;
             let c = edge.borrow().a.borrow().position;
             let d = edge.borrow().b.borrow().position;
-
-            let intersection_point = intersection_point(&(a, b), &(c, d));
-
-            // if let Some(intersection_point) = intersection_point {
-            //     self.insert_point_on_edge(intersection_point, edge.clone());
-            // }
 
             let edge_indices = edge.borrow().edge_indices();
 
@@ -375,16 +369,19 @@ impl CDT {
         let face_1 = self.add_face([start.clone(), end.clone(), v.clone()]);
         let face_2 = self.add_face([end.clone(), start.clone(), vs.clone()]);
 
-        new_faces.push(face_1);
-        new_faces.push(face_2);
+        new_faces.push(face_1.clone());
+        new_faces.push(face_2.clone());
 
-        let mut line = Vec::new();
+        let new_edge = self
+            .get_sym_edge_for_half_edge(&face_1.borrow().edges[0])
+            .unwrap();
+        let new_edge = new_edge.borrow().edge.clone();
+        new_edge.borrow_mut().insert_constraint(constraint_id);
 
-        line.push(start.clone());
-        line.extend(top_vertices);
-        line.push(end.clone());
-        bottom_vertices.reverse();
-        line.extend(bottom_vertices);
+        println!(
+            "Added constraint edge {:?}",
+            new_edge.borrow().edge_indices()
+        );
 
         let mut edges = VecDeque::new();
 
@@ -426,6 +423,30 @@ impl CDT {
                 edge_list.push(edge.clone());
             }
         }
+
+        //Sort edge list by the distance of the start vertex and the intersection point
+        edge_list.sort_by(|a, b| {
+            let a = a.borrow();
+            let b = b.borrow();
+
+            let a = intersection_point(
+                &(start.borrow().position, end.borrow().position),
+                &(a.a.borrow().position, a.b.borrow().position),
+            )
+            .unwrap();
+
+            let b = intersection_point(
+                &(start.borrow().position, end.borrow().position),
+                &(b.a.borrow().position, b.b.borrow().position),
+            )
+            .unwrap();
+
+            let a_length = (a - start.borrow().position).length();
+
+            let b_length = (b - start.borrow().position).length();
+
+            a_length.partial_cmp(&b_length).unwrap()
+        });
 
         // // Get the initial half-edge from the starting vertex
         // let sym_edge = self

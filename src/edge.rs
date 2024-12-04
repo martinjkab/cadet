@@ -1,6 +1,5 @@
 use std::{cell::RefCell, collections::HashSet, rc::Rc};
 
-
 use crate::vertex::Vertex;
 
 #[derive(Debug)]
@@ -13,6 +12,10 @@ pub struct Edge {
 impl Edge {
     pub fn edge_indices(&self) -> (usize, usize) {
         (self.a.borrow().index, self.b.borrow().index)
+    }
+
+    pub fn insert_constraint(&mut self, constraint: usize) {
+        self.crep.insert(constraint);
     }
 }
 
