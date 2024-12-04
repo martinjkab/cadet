@@ -40,7 +40,7 @@ impl CDT {
         let vertex_list = constraint_segment
             .constraints
             .iter()
-            .map(|point| {
+            .filter_map(|point| {
                 // Step 1: Locate the point in the triangulation
                 let locate_result = self.locate_point(point);
 
@@ -52,7 +52,6 @@ impl CDT {
                     LocateResult::None => None,
                 }
             })
-            .filter_map(|v| v)
             .collect::<Vec<_>>();
 
         // // Step 4: Insert segments between successive vertices

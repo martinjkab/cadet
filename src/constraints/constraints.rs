@@ -66,7 +66,7 @@ impl ConstraintSegment {
             circle.push(DVec2 { x, y });
         }
         ConstraintSegment {
-            constraints: circle.iter().map(|&position| position).collect(),
+            constraints: circle.to_vec(),
             id,
         }
     }
@@ -81,7 +81,7 @@ impl ConstraintSegment {
         }
 
         ConstraintSegment {
-            constraints: line.iter().map(|&position| position).collect(),
+            constraints: line.to_vec(),
             id,
         }
     }
@@ -107,7 +107,7 @@ impl ConstraintSegment {
         });
 
         ConstraintSegment {
-            constraints: square.iter().map(|&position| position).collect(),
+            constraints: square.to_vec(),
             id,
         }
     }
