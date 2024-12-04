@@ -37,33 +37,29 @@ impl CDT {
     }
 
     pub fn insert_constraint(&mut self, constraint_segment: &ConstraintSegment) {
-        let constraint_id = constraint_segment.id;
-        let constraint_points = &constraint_segment.constraints;
-        let mut vertex_list = Vec::new();
+        let vertex_list = constraint_segment
+            .constraints
+            .iter()
+            .map(|point| {
+                // Step 1: Locate the point in the triangulation
+                let locate_result = self.locate_point(point);
 
-        for point in constraint_points.iter() {
-            // Step 1: Locate the point in the triangulation
-            let locate_result = self.locate_point(point);
-
-            // Step 2: Handle the locate result
-            let vertex = match locate_result {
-                LocateResult::Vertex(v) => v,
-                LocateResult::Edge(edge) => self.insert_point_on_edge(*point, edge),
-                LocateResult::Face(face) => self.insert_point_in_face(*point, face),
-                LocateResult::None => {
-                    continue;
+                // Step 2: Handle the locate result
+                match locate_result {
+                    LocateResult::Vertex(v) => Some(v),
+                    LocateResult::Edge(edge) => Some(self.insert_point_on_edge(*point, edge)),
+                    LocateResult::Face(face) => Some(self.insert_point_in_face(*point, face)),
+                    LocateResult::None => None,
                 }
-            };
-
-            // Step 3: Add the vertex to the list
-            vertex_list.push(vertex);
-        }
+            })
+            .filter_map(|v| v)
+            .collect::<Vec<_>>();
 
         // // Step 4: Insert segments between successive vertices
         for i in 0..vertex_list.len() - 1 {
             let v = vertex_list[i].clone();
             let vs = vertex_list[i + 1].clone();
-            self.insert_segment(v, vs, constraint_id);
+            self.insert_segment(v, vs, constraint_segment.id);
         }
     }
 
