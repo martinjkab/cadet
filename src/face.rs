@@ -9,20 +9,11 @@ pub struct Face {
 }
 
 impl Face {
-    pub fn edges(&self) -> [(usize, usize); 3] {
+    pub fn edges(&self) -> [(Rc<RefCell<Vertex>>, Rc<RefCell<Vertex>>); 3] {
         [
-            (
-                self.vertices[0].borrow().index,
-                self.vertices[1].borrow().index,
-            ),
-            (
-                self.vertices[1].borrow().index,
-                self.vertices[2].borrow().index,
-            ),
-            (
-                self.vertices[2].borrow().index,
-                self.vertices[0].borrow().index,
-            ),
+            (self.vertices[0].clone(), self.vertices[1].clone()),
+            (self.vertices[1].clone(), self.vertices[2].clone()),
+            (self.vertices[2].clone(), self.vertices[0].clone()),
         ]
     }
     pub fn edge_indices(&self) -> [(usize, usize); 3] {
@@ -61,5 +52,15 @@ impl Face {
             })
             .cloned()
             .expect("Edge not found in face")
+    }
+}
+
+pub trait ToIndices<T> {
+    fn to_indices(&self) -> T;
+}
+
+impl ToIndices<(usize, usize)> for (Rc<RefCell<Vertex>>, Rc<RefCell<Vertex>>) {
+    fn to_indices(&self) -> (usize, usize) {
+        (self.0.borrow().index, self.1.borrow().index)
     }
 }

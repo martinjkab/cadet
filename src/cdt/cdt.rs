@@ -9,7 +9,7 @@ use glam::DVec2;
 use crate::{
     constraints::constraints::{ConstraintSegment, Constraints},
     edge::Edge,
-    face::Face,
+    face::{Face, ToIndices},
     helper::{intersection_point, is_ccw, is_crossing, ProjectToLine},
     locate_result::LocateResult,
     orientation::Orientation,
@@ -95,17 +95,19 @@ impl CDT {
         let face_1_edges = face_1.borrow().edges();
         let face_2_edges = face_2.borrow().edges();
 
-        let face_1_edges = face_1_edges
-            .iter()
-            .filter(|face_edge| !face_edge.symmetric_compare(&edge.edge_indices()))
-            .map(|edge| (self.vertices[edge.0].clone(), self.vertices[edge.1].clone()))
-            .collect::<Vec<_>>();
+        let filter_and_map_edges = |edges: &[(Rc<RefCell<Vertex>>, Rc<RefCell<Vertex>>)]| {
+            edges
+                .iter()
+                .filter(|face_edge| {
+                    !(face_edge.0.borrow().index, face_edge.1.borrow().index)
+                        .symmetric_compare(&edge_indices)
+                })
+                .map(|edge| (edge.0.clone(), edge.1.clone()))
+                .collect::<Vec<_>>()
+        };
 
-        let face_2_edges = face_2_edges
-            .iter()
-            .filter(|face_edge| !face_edge.symmetric_compare(&edge.edge_indices()))
-            .map(|edge| (self.vertices[edge.0].clone(), self.vertices[edge.1].clone()))
-            .collect::<Vec<_>>();
+        let face_1_edges = filter_and_map_edges(&face_1_edges);
+        let face_2_edges = filter_and_map_edges(&face_2_edges);
 
         assert!(face_1_edges.len() == 2);
         assert!(face_2_edges.len() == 2);
@@ -123,12 +125,9 @@ impl CDT {
                 [face_1_edges.clone(), face_2_edges.clone()]
                     .iter()
                     .flatten()
-                    .any(|face_edge| {
-                        (face_edge.0.borrow().index, face_edge.1.borrow().index)
-                            .symmetric_compare(edge)
-                    })
+                    .any(|face_edge| face_edge.symmetric_compare(edge))
             })
-            .map(|edge| self.get_sym_edge_for_half_edge(&edge).unwrap())
+            .map(|edge| self.get_sym_edge_for_half_edge(&edge.to_indices()).unwrap())
             .map(|edge| edge.borrow().edge.clone())
             .collect::<Vec<_>>();
 
@@ -165,7 +164,6 @@ impl CDT {
             .edges()
             .iter()
             .map(|edge| {
-                let edge = (self.vertices[edge.0].clone(), self.vertices[edge.1].clone());
                 let vertices = [edge.0.clone(), edge.1.clone(), v.clone()];
 
                 self.add_face(vertices)
@@ -181,7 +179,7 @@ impl CDT {
                     .iter()
                     .any(|face_edge| face_edge.symmetric_compare(edge))
             })
-            .map(|edge| self.get_sym_edge_for_half_edge(&edge).unwrap())
+            .map(|edge| self.get_sym_edge_for_half_edge(&edge.to_indices()).unwrap())
             .map(|edge| edge.borrow().edge.clone())
             .collect::<Vec<_>>();
 
@@ -338,7 +336,7 @@ impl CDT {
             new_faces.push(face_2.clone());
 
             let new_edge = self
-                .get_sym_edge_for_half_edge(&face_1.borrow().edges()[0])
+                .get_sym_edge_for_half_edge(&face_1.borrow().edge_indices()[0])
                 .unwrap();
             let new_edge = new_edge.borrow().edge.clone();
             new_edge.borrow_mut().insert_constraint(constraint_id);
@@ -347,7 +345,7 @@ impl CDT {
 
             for i in new_faces.iter() {
                 let face = i.borrow();
-                for edge in face.edges().iter() {
+                for edge in face.edge_indices().iter() {
                     edges.push_back(
                         self.get_sym_edge_for_half_edge(edge)
                             .unwrap()
