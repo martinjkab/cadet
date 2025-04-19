@@ -1,5 +1,9 @@
 use std::io::{BufRead, Write};
 
+use fontdue::{
+    layout::{CoordinateSystem, Layout, LayoutSettings, TextStyle},
+    Font,
+};
 use glam::DVec2;
 
 pub struct Constraints {
@@ -60,7 +64,7 @@ impl ConstraintSegment {
     pub fn generate_circle(center: DVec2, r: f64, n: usize, id: usize) -> ConstraintSegment {
         let mut circle = Vec::new();
         let step = 2. * std::f64::consts::PI / n as f64;
-        for i in 0..n {
+        for i in 0..n + 1 {
             let x = center.x + r * f64::cos(i as f64 * step);
             let y = center.y + r * f64::sin(i as f64 * step);
             circle.push(DVec2 { x, y });

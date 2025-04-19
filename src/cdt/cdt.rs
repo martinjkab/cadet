@@ -54,6 +54,11 @@ impl CDT {
             })
             .collect::<Vec<_>>();
 
+        // self.export_to_obj("./models/output.obj");
+
+        // // Wait 100ms
+        // std::thread::sleep(std::time::Duration::from_millis(1000));
+
         // // Step 3: Insert segments between successive vertices
         for i in 0..vertex_list.len() - 1 {
             let v = vertex_list[i].clone();
@@ -68,9 +73,8 @@ impl CDT {
         edge: Rc<RefCell<Edge>>,
     ) -> Rc<RefCell<Vertex>> {
         let edge = edge.borrow();
-        let a = edge.a.borrow();
-        let b = edge.b.borrow();
-        let position = point.project_to_line(&(a.position, b.position));
+
+        let position = point.project_to_line(&(edge.a.borrow().position, edge.b.borrow().position));
         let v = self.add_vertex(position, 1);
         let edge_indices = edge.edge_indices();
 
@@ -165,7 +169,6 @@ impl CDT {
             .iter()
             .map(|edge| {
                 let vertices = [edge.0.clone(), edge.1.clone(), v.clone()];
-
                 self.add_face(vertices)
             })
             .collect::<Vec<_>>();
@@ -248,16 +251,6 @@ impl CDT {
 
             let edge_list = self.find_crossing_edges(start.clone(), end.clone());
 
-            println!(
-                "Crossing edges of start {:?} and end {:?}: {:?}",
-                start.borrow().index,
-                end.borrow().index,
-                edge_list
-                    .iter()
-                    .map(|edge| { edge.borrow().edge_indices() })
-                    .collect::<Vec<_>>()
-            );
-
             let mut top_vertices = Vec::new();
             let mut bottom_vertices = Vec::new();
 
@@ -265,7 +258,6 @@ impl CDT {
                 let a = start.borrow().position;
                 let b = end.borrow().position;
                 let c = edge.borrow().a.borrow().position;
-                let d = edge.borrow().b.borrow().position;
 
                 let edge_indices = edge.borrow().edge_indices();
 
@@ -401,7 +393,6 @@ impl CDT {
             .unwrap();
 
             let a_length = (a - start.borrow().position).length();
-
             let b_length = (b - start.borrow().position).length();
 
             a_length.partial_cmp(&b_length).unwrap()

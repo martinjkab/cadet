@@ -131,14 +131,13 @@ impl CDT {
         self.remove_face(f2.clone());
 
         // Create two completely new faces
-        let f1 = self.add_face([v2.clone(), v1.clone(), edge.borrow().a.clone()]);
+        self.add_face([v2.clone(), v1.clone(), edge.borrow().a.clone()]);
 
-        let f2 = self.add_face([v1.clone(), v2.clone(), edge.borrow().b.clone()]);
+        self.add_face([v1.clone(), v2.clone(), edge.borrow().b.clone()]);
 
         // self.export_to_obj("./models/output.obj");
 
-        //Waiting for user input
-        // let mut input = String::new();
-        // std::io::stdin().read_line(&mut input).unwrap();
+        // // Wait 100ms
+        // std::thread::sleep(std::time::Duration::from_millis(1000));
     }
 }

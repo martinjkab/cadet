@@ -6,6 +6,7 @@ edition = "2021"
 [dependencies]
 easy-gltf = "1.1.2"
 euclid = "0.22.11"
+fontdue = "0.9.2"
 geo = "0.29.2"
 glam = "0.29.2"
 intersection_detection = "=0.1.2"
