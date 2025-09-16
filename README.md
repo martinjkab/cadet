@@ -1,4 +1,4 @@
-# CDT: Constrained Delaunay Triangulation
+# CADET: Constrained Delaunay Triangulation
 
 <p align="center">
   <img src="assets/logo.png" alt="Project Logo" width="120" />
