@@ -25,9 +25,6 @@ CDT is a Rust library and CLI tool for performing Constrained Delaunay Triangula
 
 <p align="center">
   <img src="assets/examples/circle_result.png" alt="Triangulation Output" width="350" />
-</p>
-
-<p align="center">
   <img src="assets/examples/olympics_result.png" alt="Triangulation Output" width="350" />
 </p>
 
