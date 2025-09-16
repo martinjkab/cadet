@@ -21,6 +21,16 @@ CDT is a Rust library and CLI tool for performing Constrained Delaunay Triangula
 - **Font Asset Integration**: Includes font assets for rendering or annotation.
 - **Modular Rust Codebase**: Well-structured modules for edges, faces, vertices, and triangulation logic.
 
+## Example Images
+
+<p align="center">
+  <img src="assets/examples/circle_result.png" alt="Triangulation Output" width="350" />
+</p>
+
+<p align="center">
+  <img src="assets/examples/olympics_result.png" alt="Triangulation Output" width="350" />
+</p>
+
 ## Project Structure
 
 ```
@@ -86,16 +96,6 @@ cargo run --release -- constraints/a.ct
 1.0 1.0
 0.0 1.0
 ```
-
-## Example Images
-
-<p align="center">
-  <img src="assets/examples/circle_result.png" alt="Triangulation Output" width="350" />
-</p>
-
-<p align="center">
-  <img src="assets/examples/olympics_result.png" alt="Triangulation Output" width="350" />
-</p>
 
 ## Contributing
 
