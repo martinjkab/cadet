@@ -11,7 +11,7 @@
 
 ## Overview
 
-CDT is a Rust library and CLI tool for performing Constrained Delaunay Triangulation (CDT) on geometric models. It supports reading constraint files, processing geometric data, and exporting triangulated meshes. This project demonstrates advanced computational geometry, robust Rust programming, and practical CLI design.
+CADET is a Rust library and CLI tool for performing Constrained Delaunay Triangulation (CDT) on geometric models. It supports reading constraint files, processing geometric data, and exporting triangulated meshes. This project demonstrates advanced computational geometry, robust Rust programming, and practical CLI design.
 
 ## Features
 
