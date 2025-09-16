@@ -6,7 +6,7 @@
 
 <p align="center">
   <a href="https://github.com/yourusername/cdt"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://github.com/yourusername/cdt"><img src="https://img.shields.io/badge/rust-1.70%2B-orange.svg" alt="Rust Version"></a>
+  <a href="https://github.com/yourusername/cdt"><img src="https://img.shields.io/badge/rust-1.89%2B-orange.svg" alt="Rust Version"></a>
 </p>
 
 ## Overview
